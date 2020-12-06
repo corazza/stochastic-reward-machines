@@ -20,7 +20,7 @@ from baselines.common import retro_wrappers
 from baselines.common.wrappers import ClipActionsWrapper
 from baselines.common.cmd_util import arg_parser
 
-from reward_machines.rm_environment import RewardMachineWrapper, HierarchicalRMWrapper
+from reward_machines.rm_environment import RewardMachineWrapper, RewardMachineHidden, HierarchicalRMWrapper
 
 def make_vec_env(env_id, env_type, num_env, seed, args, 
                  wrapper_kwargs=None,
@@ -81,7 +81,12 @@ def make_env(env_id, env_type, args, mpi_rank=0, subrank=0, seed=None, reward_sc
         env = HierarchicalRMWrapper(env, args.r_min, args.r_max, args.use_self_loops)
 
     if args.use_rs or args.use_crm:
-        env = RewardMachineWrapper(env, args.use_crm, args.use_rs, args.gamma, args.rs_gamma)
+        assert not args.rm_hidden
+        env = RewardMachineWrapper(env, args.use_crm, args.use_rs, args.gamma, args.rs_gamma, args.rm_id)
+
+    if args.rm_hidden:
+        assert not (args.use_rs or args.use_crm)
+        env = RewardMachineHidden(env, args.gamma, args.rs_gamma, args.rm_id)
 
     if flatten_dict_observations and isinstance(env.observation_space, gym.spaces.Dict):
         env = FlattenObservation(env)
@@ -126,4 +131,7 @@ def common_arg_parser():
     parser.add_argument('--r_min', help="R-min reward used for training option policies in hrm", type=float, default=0.0)
     parser.add_argument('--r_max', help="R-max reward used for training option policies in hrm", type=float, default=1.0)
     parser.add_argument("--use_self_loops", help="Add option policies for self-loops in the RMs", action="store_true", default=False)
+    # JIRP
+    parser.add_argument("--rm_hidden", help="Hide RM observations", action="store_true", default=False)
+    parser.add_argument('--rm_id', help="Use this RM", type=int, default=0)
     return parser

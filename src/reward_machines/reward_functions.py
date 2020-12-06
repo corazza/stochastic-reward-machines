@@ -26,6 +26,12 @@ class ConstantRewardFunction(RewardFunction):
     def get_reward(self, s_info):
         return self.c
 
+    def __str__(self):
+        return str(self.c)
+
+    def __repr__(self):
+        return str(self.c)
+
 class RewardControl(RewardFunction):
     """
     Gives a reward for moving forward

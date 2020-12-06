@@ -1,0 +1,21 @@
+begin rm string, n_states=5
+2
+[1]
+(2,2,'!g&!f&!a&!n&!b&!e&!d&!c|a|c|g|d|b',ConstantRewardFunction(0.0))
+(2,3,'n',ConstantRewardFunction(0.0))
+(2,5,'e',ConstantRewardFunction(0.0))
+(2,4,'f',ConstantRewardFunction(0.0))
+(3,3,'!g&!f&!a&!n&!b&!e&!d&!c|a|c|n|e|f|d|b',ConstantRewardFunction(0.0))
+(3,2,'g',ConstantRewardFunction(1.0))
+(4,4,'!g&!f&!a&!n&!b&!e&!d&!c|a|c|g|f|d|b',ConstantRewardFunction(0.0))
+(4,2,'n',ConstantRewardFunction(0.0))
+(4,3,'e',ConstantRewardFunction(0.0))
+(5,5,'!g&!f&!a&!n&!b&!e&!d&!c|a|c|g|e|d|b',ConstantRewardFunction(0.0))
+(5,3,'n|f',ConstantRewardFunction(0.0))
+end rm string
+{2: {2: '!g&!f&!a&!n&!b&!e&!d&!c|a|c|g|d|b', 3: 'n', 5: 'e', 4: 'f'}, 3: {3: '!g
+&!f&!a&!n&!b&!e&!d&!c|a|c|n|e|f|d|b', 2: 'g'}, 4: {4: '!g&!f&!a&!n&!b&!e&!d&!c|a
+|c|g|f|d|b', 2: 'n', 3: 'e'}, 5: {5: '!g&!f&!a&!n&!b&!e&!d&!c|a|c|g|e|d|b', 3: '
+n|f'}}
+{2: {2: 0.0, 3: 0.0, 5: 0.0, 4: 0.0}, 3: {3: 0.0, 2: 1.0}, 4: {4: 0.0, 2: 0.0, 3
+: 0.0}, 5: {5: 0.0, 3: 0.0}}

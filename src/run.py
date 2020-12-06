@@ -18,7 +18,7 @@ from importlib import import_module
 # Importing our environments and auxiliary functions
 import envs
 from envs.water.water_world import Ball, BallAgent
-from reward_machines.rm_environment import RewardMachineWrapper
+from reward_machines.rm_environment import RewardMachineWrapper, RewardMachineHidden
 from cmd_util import make_vec_env, make_env, common_arg_parser
 
 try:
@@ -104,7 +104,7 @@ def build_env(args):
 
     env_type, env_id = get_env_type(args)
 
-    if alg in ['deepq', 'qlearning', 'hrm', 'dhrm']:
+    if alg in ['deepq', 'qlearning', 'jirp', 'hrm', 'dhrm']:
         env = make_env(env_id, env_type, args, seed=seed, logger_dir=logger.get_dir())
     else:
         config = tf.ConfigProto(allow_soft_placement=True,
