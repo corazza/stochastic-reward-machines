@@ -67,10 +67,14 @@ class RewardMachineEnv(gym.Wrapper):
         self.current_rm    = None
 
     def reset(self):
+        # raise ValueError()
         # Reseting the environment and selecting the next RM tasks
         self.obs = self.env.reset()
-        self.current_rm_id = (self.current_rm_id+1)%self.num_rms
+
+        # self.current_rm_id = (self.current_rm_id+1)%self.num_rms
+        self.current_rm_id = 2
         self.current_rm    = self.reward_machines[self.current_rm_id]
+        
         self.current_u_id  = self.current_rm.reset()
 
         # Adding the RM state to the observation
@@ -100,7 +104,7 @@ class RewardMachineEnv(gym.Wrapper):
     def get_observation(self, next_obs, rm_id, u_id, done):
         rm_feat = self.rm_done_feat if done else self.rm_state_features[(rm_id,u_id)]
         rm_obs = {'features': next_obs,'rm-state': rm_feat}
-        return gym.spaces.flatten(self.observation_dict, rm_obs)           
+        return gym.spaces.flatten(self.observation_dict, rm_obs)
 
 
 class RewardMachineHidden(gym.Wrapper):
@@ -131,9 +135,13 @@ class RewardMachineHidden(gym.Wrapper):
     def get_rm(self):
         return self.current_rm
 
+    def hidden_obs(self, obs):
+        obs = gym.spaces.unflatten(self.observation_dict, obs)
+        return obs["features"]
+
     def reset(self):
         # Reseting the environment and selecting the next RM tasks
-        self.obs = self.env.reset()
+        self.obs = self.hidden_obs(self.env.reset())
         self.current_u_id  = self.current_rm.reset()
 
         # print()
@@ -147,12 +155,14 @@ class RewardMachineHidden(gym.Wrapper):
         # print(f"rolling average = {int(float(sum(last_n))/float(len(last_n)))}")
 
         # Adding the RM state to the observation
-        return self.get_observation(self.obs, self.current_rm_id, self.current_u_id, False)
+        return self.hidden_obs(self.get_observation(self.obs, self.current_rm_id, self.current_u_id, False))
 
     def step(self, action):
         # self.after_last_reset += 1
         # executing the action in the environment
         next_obs, _original_reward, env_done, info = self.env.step(action)
+
+        next_obs = self.hidden_obs(next_obs)
 
         # getting the output of the detectors and saving information for generating counterfactual experiences
         true_props = self.env.get_events()
@@ -163,8 +173,8 @@ class RewardMachineHidden(gym.Wrapper):
         old_u = self.current_u_id
         self.current_u_id, rm_rew, rm_done = self.current_rm.step(self.current_u_id, true_props, info)
 
-        # print(f"ICARTE: {old_u} -> {self.current_u_id} on {true_props}")
-
+        # if true_props != '':
+        #     print(f"ICARTE: {old_u} -> {self.current_u_id} on {true_props}")
 
         # if rm_rew != 0.0:
         #     print(f"got reward on {true_props}, {self.current_u_id}, {rm_done}")
@@ -262,20 +272,20 @@ class RewardMachineWrapper(gym.Wrapper):
         reachable_states = set()
         experiences = []
 
-        # rm = self.current_rm
-        # rm_id = self.current_rm_id
+        rm = self.current_rm
+        rm_id = self.current_rm_id
 
-        for rm_id, rm in enumerate(self.reward_machines):
-            for u_id in rm.get_states():
-                #if (rm_id,u_id) != (self.current_rm_id,self.current_u_id):
-                #    if ("c" in self.last_true_props and u_id == 0) or ("d" in self.last_true_props and u_id == 1): 
-                #        continue # <- HERE!!!!
-                exp, next_u = self._get_rm_experience(rm_id, rm, u_id, obs, action, next_obs, env_done, true_props, info)
-                reachable_states.add((rm_id,next_u))
-                # JAN this is maybe to handle multiple RMs
-                if self.valid_states is None or (rm_id,u_id) in self.valid_states:
-                    # We only add experience that are possible (i.e., it is possible to reach state u_id given the previous experience)
-                    experiences.append(exp)
+        # for rm_id, rm in enumerate(self.reward_machines):
+        for u_id in rm.get_states():
+            #if (rm_id,u_id) != (self.current_rm_id,self.current_u_id):
+            #    if ("c" in self.last_true_props and u_id == 0) or ("d" in self.last_true_props and u_id == 1): 
+            #        continue # <- HERE!!!!
+            exp, next_u = self._get_rm_experience(rm_id, rm, u_id, obs, action, next_obs, env_done, true_props, info)
+            reachable_states.add((rm_id,next_u))
+            # JAN this is maybe to handle multiple RMs
+            if self.valid_states is None or (rm_id,u_id) in self.valid_states:
+                # We only add experience that are possible (i.e., it is possible to reach state u_id given the previous experience)
+                experiences.append(exp)
 
         self.valid_states = reachable_states
         return experiences

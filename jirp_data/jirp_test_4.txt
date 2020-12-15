@@ -1,0 +1,14 @@
+1
+[]
+(1,1,'!a&!n&!g&!d&!e&!b&!f&!c|c|g|b|a|d|n',ConstantRewardFunction(0.0))
+(1,3,'f',ConstantRewardFunction(0.0))
+(1,4,'e',ConstantRewardFunction(0.0))
+(2,2,'!a&!n&!g&!d&!e&!b&!f&!c|f|c|b|e|d',ConstantRewardFunction(0.0))
+(2,3,'g',ConstantRewardFunction(1.0))
+(2,1,'a|n',ConstantRewardFunction(0.0))
+(3,3,'!a&!n&!g&!d&!e&!b&!f&!c|f|c|g|b|a|d',ConstantRewardFunction(0.0))
+(3,2,'e',ConstantRewardFunction(0.0))
+(3,1,'n',ConstantRewardFunction(0.0))
+(4,4,'!a&!n&!g&!d&!e&!b&!f&!c|c|g|b|e|d',ConstantRewardFunction(0.0))
+(4,2,'f|a',ConstantRewardFunction(0.0))
+(4,1,'n',ConstantRewardFunction(0.0))

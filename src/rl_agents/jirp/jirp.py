@@ -10,7 +10,7 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 _MAX_N_STATES = 50 # TODO FIXME guarantee?
-_UPDATE_X_EVERY = 1500 # episodes
+_UPDATE_X_EVERY = 500 # episodes
 _USE_TERMINAL_STATE = False
 
 
@@ -313,7 +313,6 @@ def learn(env,
     num_episodes = 0
     actions = list(range(env.action_space.n))
 
-
     # H, n_states_last = initial_hyp()
 
     H = env.get_rm()
@@ -335,9 +334,11 @@ def learn(env,
     X_new = set()
     labels = []
     rewards = []
+    percentages = []
 
     while step < total_timesteps:
         s = tuple(env.reset())
+        true_props = env.get_events()
         rm_state = H.reset()
         # print("reset")
         # print(labels)
@@ -350,7 +351,6 @@ def learn(env,
         while True:
             # Selecting and executing the action
             a = random.choice(actions) if random.random() < epsilon else get_best_action(Q[rm_state],s,actions,q_init)
-            
             sn, r, done, info = env.step(a)
 
             # if r > 0:
@@ -361,25 +361,33 @@ def learn(env,
             labels.append(true_props) # L(s, a, s')
             next_rm_state, _rm_reward, rm_done = H.step(rm_state, true_props, info)
 
-            # print(f"JIRP: {rm_state} -> {next_rm_state} on {true_props}")
+            # if true_props != '':
+            #     print(f"JIRP: {rm_state} -> {next_rm_state} on {true_props}")
+            #     print()
 
             # if not rm_done: # learn while possible
             # update Q-function of current RM state
             if s not in Q[rm_state]: Q[rm_state][s] = dict([(b, q_init) for b in actions])
             if done: _delta = r - Q[rm_state][s][a]
-            else:    _delta = r + gamma*get_qmax(Q[rm_state], sn, actions, q_init) - Q[rm_state][s][a]
+            else:    _delta = r + gamma*get_qmax(Q[next_rm_state], sn, actions, q_init) - Q[rm_state][s][a]
             Q[rm_state][s][a] += lr*_delta
+            # if r > 0:
+            #     print(f"Q[{rm_state}][{s}][{a}] += {lr*_delta} ({r})")
 
             # counterfactual updates
             for v in H.get_states():
                 if v == rm_state:
                     continue
-                _v_next, h_r, _h_done = H.step(v, true_props, info)
+                v_next, h_r, h_done = H.step(v, true_props, info)
                 if s not in Q[v]: Q[v][s] = dict([(b, q_init) for b in actions])
-                if done: _delta = h_r - Q[v][s][a]
-                else:    _delta = h_r + gamma*get_qmax(Q[v], sn, actions, q_init) - Q[v][s][a]
+                if h_done: _delta = h_r - Q[v][s][a]
+                else:    _delta = h_r + gamma*get_qmax(Q[v_next], sn, actions, q_init) - Q[v][s][a]
                 Q[v][s][a] += lr*_delta
+                # if h_r > 0:
+                #     print(f"cf: Q[{v}][{s}][{a}] += {lr*_delta} ({h_r})")
 
+            # if r > 0:
+            #     print()
             rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
 
             # moving to the next state
@@ -392,6 +400,7 @@ def learn(env,
                 logger.record_tabular("total reward", reward_total)
                 logger.record_tabular("positive / total", str(int(reward_total)) + "/" + str(total_episodes) + f" ({int(100*(reward_total/total_episodes))}%)")
                 logger.dump_tabular()
+                percentages.append(int(100*(reward_total/total_episodes)))
                 reward_total = 0
                 total_episodes = 0
             if done:
@@ -402,16 +411,17 @@ def learn(env,
                 if num_episodes % _UPDATE_X_EVERY == 0 and X_new:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
-                    X.update(X_new)
-                    X_new = set()
-                    # exit()
-                    H, n_states_last = consistent_hyp(X, n_states_last)
-                    # H = env.get_rm()
-                    Q = transfer_Q(H, Q)
+                    # X.update(X_new)
+                    # X_new = set()
+                    # H, n_states_last = consistent_hyp(X, n_states_last)
+                    # Q = transfer_Q(H, Q)
                     print(H.delta_u)
                     print(H.delta_r)
                 break
             s = sn
+            # true_props = true_props_next
+
+    print(float(sum(percentages[5:]))/len(percentages[5:]))
 
     with open("../jirp_data/X.txt", 'w') as x_file:
         for (ls, rs) in X:
