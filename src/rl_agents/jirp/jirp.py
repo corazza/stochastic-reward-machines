@@ -313,21 +313,7 @@ def learn(env,
     num_episodes = 0
     actions = list(range(env.action_space.n))
 
-    # H, n_states_last = initial_hyp()
-
-    H = env.get_rm()
-    n_states_last=2
-
-    # H = RewardMachine("envs/grids/reward_machines/office/t3.txt")
-    # n_states_last=2
-
-    # H = RewardMachine("../jirp_data/jirp_test_3.txt")
-    # n_states_last=2
-
-
-
-    print(H.delta_u)
-    print(H.delta_r)
+    H, n_states_last = initial_hyp()
 
     Q = initial_Q(H)
     X = set()
@@ -380,7 +366,7 @@ def learn(env,
                     continue
                 v_next, h_r, h_done = H.step(v, true_props, info)
                 if s not in Q[v]: Q[v][s] = dict([(b, q_init) for b in actions])
-                if h_done: _delta = h_r - Q[v][s][a]
+                if done: _delta = h_r - Q[v][s][a]
                 else:    _delta = h_r + gamma*get_qmax(Q[v_next], sn, actions, q_init) - Q[v][s][a]
                 Q[v][s][a] += lr*_delta
                 # if h_r > 0:
@@ -400,6 +386,7 @@ def learn(env,
                 logger.record_tabular("total reward", reward_total)
                 logger.record_tabular("positive / total", str(int(reward_total)) + "/" + str(total_episodes) + f" ({int(100*(reward_total/total_episodes))}%)")
                 logger.dump_tabular()
+                print(f"total_episodes={total_episodes}")
                 percentages.append(int(100*(reward_total/total_episodes)))
                 reward_total = 0
                 total_episodes = 0
@@ -411,10 +398,10 @@ def learn(env,
                 if num_episodes % _UPDATE_X_EVERY == 0 and X_new:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
-                    # X.update(X_new)
-                    # X_new = set()
-                    # H, n_states_last = consistent_hyp(X, n_states_last)
-                    # Q = transfer_Q(H, Q)
+                    X.update(X_new)
+                    X_new = set()
+                    H, n_states_last = consistent_hyp(X, n_states_last)
+                    Q = transfer_Q(H, Q)
                     print(H.delta_u)
                     print(H.delta_r)
                 break

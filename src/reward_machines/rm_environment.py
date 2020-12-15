@@ -72,7 +72,7 @@ class RewardMachineEnv(gym.Wrapper):
         self.obs = self.env.reset()
 
         # self.current_rm_id = (self.current_rm_id+1)%self.num_rms
-        self.current_rm_id = 2
+        self.current_rm_id = 3
         self.current_rm    = self.reward_machines[self.current_rm_id]
         
         self.current_u_id  = self.current_rm.reset()
