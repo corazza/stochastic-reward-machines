@@ -18,7 +18,7 @@ X=set([((('', '', '', '', '', '', '', '', 'a', '', '', '', '', '', '', '', '', '
 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0))])
 
-jirp = RewardMachine("jirp_test_2.txt")
+jirp = RewardMachine("../jirp_data/jirp_test_3.txt")
 icarte = RewardMachine("envs/grids/reward_machines/office/t3.txt")
 
 jirp_state = jirp.reset()

@@ -94,6 +94,8 @@ def learn(env,
                 else:     _delta = _r + gamma*get_qmax(Q,_sn,actions,q_init) - Q[_s][_a]
                 Q[_s][_a] += lr*_delta
 
+            # print(experiences)
+
             # moving to the next state
             reward_total += r
             step += 1

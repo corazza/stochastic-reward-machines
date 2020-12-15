@@ -10,7 +10,8 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 _MAX_N_STATES = 50 # TODO FIXME guarantee?
-_UPDATE_X_EVERY = 2000 # episodes
+_UPDATE_X_EVERY = 1500 # episodes
+_USE_TERMINAL_STATE = False
 
 
 def get_qmax(Q,s,actions,q_init):
@@ -90,19 +91,19 @@ def different_pairs_ordered(xs):
         for j in range(i+1, len(xs)):
             yield (xs[i], xs[j])
 
-def consistent_hyp(X):
+def consistent_hyp(X, n_states_start=2):
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
 
     from pysat.solvers import Glucose3
-    for n_states in range(2, _MAX_N_STATES+1):
-        def all_states():
-            return range(1, n_states+1)
+    for n_states in range(n_states_start, _MAX_N_STATES+1):
+        def terminal_state():
+            return 1 if _USE_TERMINAL_STATE else None
         def initial_state():
-            return 1
-        # def terminal_state():
-        #     return 1
+            return 1 if not _USE_TERMINAL_STATE else 2
+        def all_states():
+            return range(initial_state(), n_states+1)
 
         # maps SAT's propvar (int) to (p: state, l: labels, q: state)
         prop_d = dict()
@@ -198,6 +199,8 @@ def consistent_hyp(X):
                 g.add_clause([-x, o])
 
         # MEALY vs. MOORE in Icarte's overview paper
+        # fix by updating JIRP's definition of a reward machine
+        # ie. d and o -> whatever Icarte uses
         for (p, q) in all_pairs(all_states()):
             for (l1, l2) in different_pairs(language):
                 for (r1, r2) in different_pairs(reward_alphabet):
@@ -230,9 +233,6 @@ def consistent_hyp(X):
             else:
                 raise ValueError("Uknown p-var dict")
 
-        for transition in transitions:
-            print(transition, transitions[transition])
-
         delta_u = defaultdict(dict)
         delta_r = defaultdict(dict)
 
@@ -246,10 +246,17 @@ def consistent_hyp(X):
             if q not in delta_r[p]:
                 delta_r[p][q] = r
             else:
+                if not delta_r[p][q] == r:
+                    for transition in transitions:
+                        print(transition, transitions[transition])
+                    print(f"offending: {p} -> {q} (has {delta_r[p][q]} from {delta_u[p][q]}, new {r} from {l}")
                 assert delta_r[p][q] == r
-            
-        # rm_strings = [f"{initial_state()}", f"[{terminal_state()}]"]
-        rm_strings = [f"{initial_state()}", f"[]"]
+        
+        if _USE_TERMINAL_STATE:
+            rm_strings = [f"{initial_state()}", f"[{terminal_state()}]"]
+        else:
+            rm_strings = [f"{initial_state()}", f"[]"]
+    
         for p in delta_u:
             for q in delta_u[p]:
                 rs = "ConstantRewardFunction({})".format(delta_r[p][q])
@@ -268,7 +275,7 @@ def consistent_hyp(X):
         os.write(new_file, rm_string.encode())
         os.close(new_file)
 
-        return RewardMachine(filename)
+        return RewardMachine(filename), n_states
 
     raise ValueError("Couldn't find machine with at most {} states".format(_MAX_N_STATES))
 
@@ -277,6 +284,7 @@ def initial_hyp():
 
 def transfer_Q(H, prev_Q):
     Q = dict()
+    Q[-1] = dict()
     for v in H.get_states():
         Q[v] = dict()
     return Q
@@ -304,14 +312,36 @@ def learn(env,
     step = 0
     num_episodes = 0
     actions = list(range(env.action_space.n))
-    H = initial_hyp()
+
+
+    # H, n_states_last = initial_hyp()
+
+    H = env.get_rm()
+    n_states_last=2
+
+    # H = RewardMachine("envs/grids/reward_machines/office/t3.txt")
+    # n_states_last=2
+
+    # H = RewardMachine("../jirp_data/jirp_test_3.txt")
+    # n_states_last=2
+
+
+
+    print(H.delta_u)
+    print(H.delta_r)
+
     Q = initial_Q(H)
     X = set()
     X_new = set()
+    labels = []
+    rewards = []
 
     while step < total_timesteps:
         s = tuple(env.reset())
         rm_state = H.reset()
+        # print("reset")
+        # print(labels)
+        # print(rewards)
         labels = []
         rewards = []
 
@@ -322,36 +352,35 @@ def learn(env,
             a = random.choice(actions) if random.random() < epsilon else get_best_action(Q[rm_state],s,actions,q_init)
             
             sn, r, done, info = env.step(a)
+
+            # if r > 0:
+            #     print("GOT POSITIVE")
+
             sn = tuple(sn)
             true_props = env.get_events()
             labels.append(true_props) # L(s, a, s')
             next_rm_state, _rm_reward, rm_done = H.step(rm_state, true_props, info)
 
-            # if 'n' in true_props and done:
-            #     print("FINISHING ON N, rm_done=", rm_done)
+            # print(f"JIRP: {rm_state} -> {next_rm_state} on {true_props}")
 
-            if not rm_done: # learn while possible
-                # update Q-function of current RM state
-                if s not in Q[rm_state]: Q[rm_state][s] = dict([(b, q_init) for b in actions])
-                if done: _delta = r - Q[rm_state][s][a]
-                else:    _delta = r + gamma*get_qmax(Q[rm_state], sn, actions, q_init) - Q[rm_state][s][a]
-                Q[rm_state][s][a] += lr*_delta
-                # if 'n' in true_props and done:
-                #     print(f"Q[rm_state={rm_state}][s][a] += {lr*_delta}")
+            # if not rm_done: # learn while possible
+            # update Q-function of current RM state
+            if s not in Q[rm_state]: Q[rm_state][s] = dict([(b, q_init) for b in actions])
+            if done: _delta = r - Q[rm_state][s][a]
+            else:    _delta = r + gamma*get_qmax(Q[rm_state], sn, actions, q_init) - Q[rm_state][s][a]
+            Q[rm_state][s][a] += lr*_delta
 
-                # counterfactual updates
-                for v in H.get_states():
-                    if v == rm_state:
-                        continue
-                    _v_next, h_r, _h_done = H.step(v, true_props, info)
-                    if s not in Q[v]: Q[v][s] = dict([(b, q_init) for b in actions])
-                    if done: _delta = h_r - Q[v][s][a]
-                    else:    _delta = h_r + gamma*get_qmax(Q[v], sn, actions, q_init) - Q[v][s][a]
-                    Q[v][s][a] += lr*_delta
-                    # if 'n' in true_props and done:
-                    #     print(f"Q[v={v}][s][a] += {lr*_delta}")
+            # counterfactual updates
+            for v in H.get_states():
+                if v == rm_state:
+                    continue
+                _v_next, h_r, _h_done = H.step(v, true_props, info)
+                if s not in Q[v]: Q[v][s] = dict([(b, q_init) for b in actions])
+                if done: _delta = h_r - Q[v][s][a]
+                else:    _delta = h_r + gamma*get_qmax(Q[v], sn, actions, q_init) - Q[v][s][a]
+                Q[v][s][a] += lr*_delta
 
-                rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
+            rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
 
             # moving to the next state
             reward_total += r
@@ -376,9 +405,15 @@ def learn(env,
                     X.update(X_new)
                     X_new = set()
                     # exit()
-                    H = consistent_hyp(X)
+                    H, n_states_last = consistent_hyp(X, n_states_last)
+                    # H = env.get_rm()
                     Q = transfer_Q(H, Q)
                     print(H.delta_u)
                     print(H.delta_r)
                 break
             s = sn
+
+    with open("../jirp_data/X.txt", 'w') as x_file:
+        for (ls, rs) in X:
+            x_file.write(str(ls) + '\n')
+            x_file.write(str(rs) + "\n\n")

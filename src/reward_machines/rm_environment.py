@@ -128,10 +128,15 @@ class RewardMachineHidden(gym.Wrapper):
     def is_hidden_rm(self):
         return True
 
+    def get_rm(self):
+        return self.current_rm
+
     def reset(self):
         # Reseting the environment and selecting the next RM tasks
         self.obs = self.env.reset()
         self.current_u_id  = self.current_rm.reset()
+
+        # print()
 
         # print(f"steps after last reset={self.after_last_reset}")
         # self.after_last_reset_acc.append(self.after_last_reset)
@@ -155,7 +160,11 @@ class RewardMachineHidden(gym.Wrapper):
         self.obs = next_obs
 
         # update the RM state
+        old_u = self.current_u_id
         self.current_u_id, rm_rew, rm_done = self.current_rm.step(self.current_u_id, true_props, info)
+
+        # print(f"ICARTE: {old_u} -> {self.current_u_id} on {true_props}")
+
 
         # if rm_rew != 0.0:
         #     print(f"got reward on {true_props}, {self.current_u_id}, {rm_done}")
@@ -206,6 +215,8 @@ class RewardMachineWrapper(gym.Wrapper):
         self.obs = self.env.reset()
         self.current_u_id  = self.current_rm.reset()
 
+        # print(self.current_rm_id)
+
         # self.after_last_reset_acc.append(self.after_last_reset)
         # self.after_last_reset = 0
         # n = 50
@@ -250,6 +261,10 @@ class RewardMachineWrapper(gym.Wrapper):
         """
         reachable_states = set()
         experiences = []
+
+        # rm = self.current_rm
+        # rm_id = self.current_rm_id
+
         for rm_id, rm in enumerate(self.reward_machines):
             for u_id in rm.get_states():
                 #if (rm_id,u_id) != (self.current_rm_id,self.current_u_id):
@@ -257,6 +272,7 @@ class RewardMachineWrapper(gym.Wrapper):
                 #        continue # <- HERE!!!!
                 exp, next_u = self._get_rm_experience(rm_id, rm, u_id, obs, action, next_obs, env_done, true_props, info)
                 reachable_states.add((rm_id,next_u))
+                # JAN this is maybe to handle multiple RMs
                 if self.valid_states is None or (rm_id,u_id) in self.valid_states:
                     # We only add experience that are possible (i.e., it is possible to reach state u_id given the previous experience)
                     experiences.append(exp)

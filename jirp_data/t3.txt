@@ -1,0 +1,28 @@
+0 # initial state
+[1] # terminal state
+(0,0,'!e&!f&!n',ConstantRewardFunction(0))
+(0,2,'e&!n',ConstantRewardFunction(0))
+(0,3,'!e&f&!n',ConstantRewardFunction(0))
+(2,2,'!f&!n',ConstantRewardFunction(0))
+(2,4,'f&!n',ConstantRewardFunction(0))
+(3,3,'!e&!n',ConstantRewardFunction(0))
+(3,4,'e&!n',ConstantRewardFunction(0))
+(4,1,'g&!n',ConstantRewardFunction(1))
+(4,4,'!g&!n',ConstantRewardFunction(0))
+
+1
+[]
+(1,1,'!c&!f&!g&!e&!b&!a&!d&!n|n|g|d|b|c|a',ConstantRewardFunction(0.0))
+(1,2,'f',ConstantRewardFunction(0.0))
+(1,4,'e',ConstantRewardFunction(0.0))
+(2,2,'!c&!f&!g&!e&!b&!a&!d&!n|g|d|f|b|c|a',ConstantRewardFunction(0.0))
+(2,1,'n',ConstantRewardFunction(0.0))
+(2,3,'e',ConstantRewardFunction(0.0))
+(3,3,'!c&!f&!g&!e&!b&!a&!d&!n|f|b|c|e|a',ConstantRewardFunction(0.0))
+(3,1,'n',ConstantRewardFunction(0.0))
+(3,2,'g',ConstantRewardFunction(1.0))
+(3,4,'d',ConstantRewardFunction(0.0))
+(4,4,'!c&!f&!g&!e&!b&!a&!d&!n|g|d|b|c|e',ConstantRewardFunction(0.0))
+(4,1,'n',ConstantRewardFunction(0.0))
+(4,3,'f',ConstantRewardFunction(0.0))
+(4,2,'a',ConstantRewardFunction(0.0))
