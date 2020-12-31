@@ -1,0 +1,11 @@
+1
+[]
+(1,1,'!g&!f&!e&!b&!a&!d&!c|f|g|b|d',LabelRewardFunction({'!g&!f&!e&!b&!a&!d&!c': 0.0,'f': 0.0,'g': 0.0,'b': 0.0,'d': 0.0,}))
+(1,2,'a|e|c',LabelRewardFunction({'a': 0.0,'e': 0.0,'c': 0.0,}))
+(2,2,'!g&!f&!e&!b&!a&!d&!c|a|e|f|g',LabelRewardFunction({'!g&!f&!e&!b&!a&!d&!c': 0.0,'a': 0.0,'e': 0.0,'f': 0.0,'g': 0.0,}))
+(2,1,'c|b',LabelRewardFunction({'c': 0.0,'b': 0.0,}))
+(2,3,'d',LabelRewardFunction({'d': 0.0,}))
+(3,3,'!g&!f&!e&!b&!a&!d&!c|a|e|f|g|b|d',LabelRewardFunction({'!g&!f&!e&!b&!a&!d&!c': 0.0,'a': 0.0,'e': 0.0,'f': 0.0,'g': 0.0,'b': 0.0,'d': 0.0,}))
+(3,4,'c',LabelRewardFunction({'c': 0.0,}))
+(4,4,'!g&!f&!e&!b&!a&!d&!c|e|f|g|c|d',LabelRewardFunction({'!g&!f&!e&!b&!a&!d&!c': 0.0,'e': 0.0,'f': 0.0,'g': 0.0,'c': 0.0,'d': 0.0,}))
+(4,3,'a|b',LabelRewardFunction({'a': 0.0,'b': 1.0,}))

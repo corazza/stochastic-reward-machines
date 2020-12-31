@@ -72,7 +72,7 @@ class RewardMachineEnv(gym.Wrapper):
         self.obs = self.env.reset()
 
         # self.current_rm_id = (self.current_rm_id+1)%self.num_rms
-        self.current_rm_id = 3
+        self.current_rm_id = 1
         self.current_rm    = self.reward_machines[self.current_rm_id]
         
         self.current_u_id  = self.current_rm.reset()
@@ -170,7 +170,7 @@ class RewardMachineHidden(gym.Wrapper):
         self.obs = next_obs
 
         # update the RM state
-        old_u = self.current_u_id
+        info["true_props"] = true_props
         self.current_u_id, rm_rew, rm_done = self.current_rm.step(self.current_u_id, true_props, info)
 
         # if true_props != '':

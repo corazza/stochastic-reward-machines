@@ -10,7 +10,7 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 _MAX_N_STATES = 50 # TODO FIXME guarantee?
-_UPDATE_X_EVERY = 500 # episodes
+_UPDATE_X_EVERY = 2500 # episodes
 _USE_TERMINAL_STATE = False
 
 
@@ -201,14 +201,14 @@ def consistent_hyp(X, n_states_start=2):
         # MEALY vs. MOORE in Icarte's overview paper
         # fix by updating JIRP's definition of a reward machine
         # ie. d and o -> whatever Icarte uses
-        for (p, q) in all_pairs(all_states()):
-            for (l1, l2) in different_pairs(language):
-                for (r1, r2) in different_pairs(reward_alphabet):
-                    d1 = add_pvar_d((p, l1, q))
-                    d2 = add_pvar_d((p, l2, q))
-                    o1 = add_pvar_o((p, l1, r1))
-                    o2 = add_pvar_o((p, l2, r2))
-                    g.add_clause([-d1, -d2, -o1, -o2])
+        # for (p, q) in all_pairs(all_states()):
+        #     for (l1, l2) in different_pairs(language):
+        #         for (r1, r2) in different_pairs(reward_alphabet):
+        #             d1 = add_pvar_d((p, l1, q))
+        #             d2 = add_pvar_d((p, l2, q))
+        #             o1 = add_pvar_o((p, l1, r1))
+        #             o2 = add_pvar_o((p, l2, r2))
+        #             g.add_clause([-d1, -d2, -o1, -o2])
 
         g.solve()
         if g.get_model() is None:
@@ -244,13 +244,14 @@ def consistent_hyp(X, n_states_start=2):
             else:
                 delta_u[p][q] = delta_u[p][q] + "|" + conj
             if q not in delta_r[p]:
-                delta_r[p][q] = r
+                delta_r[p][q] = [(conj, r)]
             else:
-                if not delta_r[p][q] == r:
-                    for transition in transitions:
-                        print(transition, transitions[transition])
-                    print(f"offending: {p} -> {q} (has {delta_r[p][q]} from {delta_u[p][q]}, new {r} from {l}")
-                assert delta_r[p][q] == r
+                delta_r[p][q].append((conj, r))
+                # if not delta_r[p][q] == r:
+                #     for transition in transitions:
+                #         print(transition, transitions[transition])
+                #     print(f"offending: {p} -> {q} (has {delta_r[p][q]} from {delta_u[p][q]}, new {r} from {l}")
+                # assert delta_r[p][q] == r
         
         if _USE_TERMINAL_STATE:
             rm_strings = [f"{initial_state()}", f"[{terminal_state()}]"]
@@ -259,7 +260,11 @@ def consistent_hyp(X, n_states_start=2):
     
         for p in delta_u:
             for q in delta_u[p]:
-                rs = "ConstantRewardFunction({})".format(delta_r[p][q])
+                rs = "{"
+                for (label, reward) in delta_r[p][q]:
+                    rs += f"'{label}': {reward},"
+                rs += "}"
+                rs = f"LabelRewardFunction({rs})"
                 s = "({},{},'{}',{})".format(p, q, delta_u[p][q], rs)
                 rm_strings.append(s)
 
