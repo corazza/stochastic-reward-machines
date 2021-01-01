@@ -3,15 +3,16 @@ JIRP based method
 """
 import os, tempfile
 from collections import defaultdict
+import random, time, copy
 
-import random, time
 from baselines import logger
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
-_MAX_N_STATES = 50 # TODO FIXME guarantee?
-_UPDATE_X_EVERY = 2500 # episodes
+_MAX_N_STATES = 50
+_UPDATE_X_EVERY = 100 # episodes
 _USE_TERMINAL_STATE = False
+_EQV_THRESHOLD = 0.95
 
 
 def get_qmax(Q,s,actions,q_init):
@@ -24,23 +25,15 @@ def get_best_action(Q,s,actions,q_init):
     best = [a for a in actions if Q[s][a] == qmax]
     return random.choice(best)
 
-def rm_run(labels, info, rm):
+def rm_run(labels, rm):
     current_state = rm.reset()
     rewards = []
     for props in labels:
-        current_state, reward, done = rm.step(current_state, props, info)
+        current_state, reward, done = rm.step(current_state, props, {"true_props": props})
         rewards.append(reward)
         if done: 
             break
     return rewards
-
-def is_counterexample(rm_rewards, env_rewards):
-    # d = len(env_rewards) - len(rm_rewards)
-    # if d == 0:
-    #     return rm_rewards != env_rewards
-    # rm_rewards.extend([rm_rewards[-1]]*d)
-    return rm_rewards != env_rewards
-    # return True
 
 def dnf_for_empty(language):
     L = set()
@@ -96,8 +89,9 @@ def consistent_hyp(X, n_states_start=2):
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
 
-    from pysat.solvers import Glucose3
+    from pysat.solvers import Glucose4
     for n_states in range(n_states_start, _MAX_N_STATES+1):
+        print(f"finding model with {n_states} states")
         def terminal_state():
             return 1 if _USE_TERMINAL_STATE else None
         def initial_state():
@@ -115,7 +109,7 @@ def consistent_hyp(X, n_states_start=2):
         prop_x = dict()
         prop_x_rev = dict()
 
-        g = Glucose3()
+        g = Glucose4()
         used_pvars = 0
         def add_pvar(d, storage, storage_rev):
             nonlocal used_pvars
@@ -176,7 +170,6 @@ def consistent_hyp(X, n_states_start=2):
         for (labels, _rewards) in prefixes(X):
             if labels == ():
                 continue
-            # print(f"prefix for {labels}")
             lm = labels[0:-1]
             l = labels[-1]
             for p in all_states():
@@ -212,8 +205,9 @@ def consistent_hyp(X, n_states_start=2):
 
         g.solve()
         if g.get_model() is None:
-            print("no model with {} states".format(n_states))
             continue
+        
+        print("found")
 
         transitions = defaultdict(lambda: [None, None])
         for pvar in g.get_model():
@@ -247,11 +241,6 @@ def consistent_hyp(X, n_states_start=2):
                 delta_r[p][q] = [(conj, r)]
             else:
                 delta_r[p][q].append((conj, r))
-                # if not delta_r[p][q] == r:
-                #     for transition in transitions:
-                #         print(transition, transitions[transition])
-                #     print(f"offending: {p} -> {q} (has {delta_r[p][q]} from {delta_u[p][q]}, new {r} from {l}")
-                # assert delta_r[p][q] == r
         
         if _USE_TERMINAL_STATE:
             rm_strings = [f"{initial_state()}", f"[{terminal_state()}]"]
@@ -270,11 +259,10 @@ def consistent_hyp(X, n_states_start=2):
 
         rm_string = "\n".join(rm_strings)
 
-        print(delta_u)
-
-        print(f"begin rm string, n_states={n_states}")
-        print(rm_string)
-        print("end rm string")
+        # print(delta_u)
+        # print(f"begin rm string, n_states={n_states}")
+        # print(rm_string)
+        # print("end rm string")
 
         new_file, filename = tempfile.mkstemp()
         os.write(new_file, rm_string.encode())
@@ -287,15 +275,46 @@ def consistent_hyp(X, n_states_start=2):
 def initial_hyp():
     return consistent_hyp(set())
 
-def transfer_Q(H, prev_Q):
+def equivalent_on_X(H1, v1, H2, v2, X):
+    print(f"checking eqv for {v1} and {v2}")
+    H1 = H1.with_initial(v1)
+    H2 = H2.with_initial(v2)
+    total = len(X)
+    eqv = 0
+    for (labels, _rewards) in X:
+        if rm_run(labels, H1) == rm_run(labels, H2):
+            eqv += 1
+    if float(eqv)/total > _EQV_THRESHOLD:
+        print(f"EQUIVALENT (p ~= {float(eqv)/total})")
+        return True
+    print("not equivalent")
+    return False
+
+def transfer_Q(H_new, H_old, Q_old, X = {}):
+    """
+    Determine if two states of H_old and H_new are equivalent by checking
+    their output on label sequences recorded in X. Although the thm. requires
+    the outputs be the same on _all_ label sequences, choosing probably
+    equivalent states may be good enough.
+    """
+    # initialize new Q
+    Q = dict()
+    Q[-1] = dict() # (-1 is the index of the terminal state) (TODO check if necessary)
+    for v in H_new.get_states():
+        Q[v] = dict()
+        # find probably equivalent state u in H_old
+        for u in H_old.get_states():
+            if equivalent_on_X(H_new, v, H_old, u, X):
+                Q[v] = copy.deepcopy(Q_old[u])
+                break
+    return Q
+
+def initial_Q(H):
     Q = dict()
     Q[-1] = dict()
     for v in H.get_states():
         Q[v] = dict()
     return Q
-
-def initial_Q(H):
-    return transfer_Q(H, dict())
 
 def learn(env,
           network=None,
@@ -331,9 +350,6 @@ def learn(env,
         s = tuple(env.reset())
         true_props = env.get_events()
         rm_state = H.reset()
-        # print("reset")
-        # print(labels)
-        # print(rewards)
         labels = []
         rewards = []
 
@@ -344,41 +360,27 @@ def learn(env,
             a = random.choice(actions) if random.random() < epsilon else get_best_action(Q[rm_state],s,actions,q_init)
             sn, r, done, info = env.step(a)
 
-            # if r > 0:
-            #     print("GOT POSITIVE")
-
             sn = tuple(sn)
             true_props = env.get_events()
             labels.append(true_props) # L(s, a, s')
-            next_rm_state, _rm_reward, rm_done = H.step(rm_state, true_props, info)
+            next_rm_state, _rm_reward, _rm_done = H.step(rm_state, true_props, info)
 
-            # if true_props != '':
-            #     print(f"JIRP: {rm_state} -> {next_rm_state} on {true_props}")
-            #     print()
-
-            # if not rm_done: # learn while possible
             # update Q-function of current RM state
             if s not in Q[rm_state]: Q[rm_state][s] = dict([(b, q_init) for b in actions])
             if done: _delta = r - Q[rm_state][s][a]
             else:    _delta = r + gamma*get_qmax(Q[next_rm_state], sn, actions, q_init) - Q[rm_state][s][a]
             Q[rm_state][s][a] += lr*_delta
-            # if r > 0:
-            #     print(f"Q[{rm_state}][{s}][{a}] += {lr*_delta} ({r})")
 
             # counterfactual updates
             for v in H.get_states():
                 if v == rm_state:
                     continue
-                v_next, h_r, h_done = H.step(v, true_props, info)
+                v_next, h_r, _h_done = H.step(v, true_props, info)
                 if s not in Q[v]: Q[v][s] = dict([(b, q_init) for b in actions])
                 if done: _delta = h_r - Q[v][s][a]
                 else:    _delta = h_r + gamma*get_qmax(Q[v_next], sn, actions, q_init) - Q[v][s][a]
                 Q[v][s][a] += lr*_delta
-                # if h_r > 0:
-                #     print(f"cf: Q[{v}][{s}][{a}] += {lr*_delta} ({h_r})")
 
-            # if r > 0:
-            #     print()
             rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
 
             # moving to the next state
@@ -391,31 +393,21 @@ def learn(env,
                 logger.record_tabular("total reward", reward_total)
                 logger.record_tabular("positive / total", str(int(reward_total)) + "/" + str(total_episodes) + f" ({int(100*(reward_total/total_episodes))}%)")
                 logger.dump_tabular()
-                print(f"total_episodes={total_episodes}")
                 percentages.append(int(100*(reward_total/total_episodes)))
                 reward_total = 0
                 total_episodes = 0
             if done:
                 num_episodes += 1
                 total_episodes += 1
-                if is_counterexample(rm_run(labels, info, H), rewards): # TODO test if this actually works (in terminal)
+                if rm_run(labels, H) != rewards:
                     X_new.add((tuple(labels), tuple(rewards)))
                 if num_episodes % _UPDATE_X_EVERY == 0 and X_new:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
                     X.update(X_new)
                     X_new = set()
-                    H, n_states_last = consistent_hyp(X, n_states_last)
-                    Q = transfer_Q(H, Q)
-                    print(H.delta_u)
-                    print(H.delta_r)
+                    H_new, n_states_last = consistent_hyp(X, n_states_last)
+                    Q = transfer_Q(H_new, H, Q, X)
+                    H = H_new
                 break
             s = sn
-            # true_props = true_props_next
-
-    print(float(sum(percentages[5:]))/len(percentages[5:]))
-
-    with open("../jirp_data/X.txt", 'w') as x_file:
-        for (ls, rs) in X:
-            x_file.write(str(ls) + '\n')
-            x_file.write(str(rs) + "\n\n")

@@ -67,14 +67,12 @@ class RewardMachineEnv(gym.Wrapper):
         self.current_rm    = None
 
     def reset(self):
-        # raise ValueError()
         # Reseting the environment and selecting the next RM tasks
         self.obs = self.env.reset()
 
-        # self.current_rm_id = (self.current_rm_id+1)%self.num_rms
-        self.current_rm_id = 1
+        self.current_rm_id = (self.current_rm_id+1)%self.num_rms
+        # self.current_rm_id = 2
         self.current_rm    = self.reward_machines[self.current_rm_id]
-        
         self.current_u_id  = self.current_rm.reset()
 
         # Adding the RM state to the observation
@@ -110,21 +108,15 @@ class RewardMachineEnv(gym.Wrapper):
 class RewardMachineHidden(gym.Wrapper):
     def __init__(self, env, gamma, rs_gamma, rm_id):
         """
-        Wrapper for RM envs where the RM is hidden from the observations.
-
-        Supports only a single RM, because RM change would have to be communicated
-        to the agent, but that channel is off here.
+        Wrapper for RM envs where the RM is hidden from the observations. Additionally it fixes a
+        constant RM for the environment.
         """
         super().__init__(env)
-        # self.observation_dict  = spaces.Dict({'features': env.observation_space, 'rm-state': spaces.Box(low=0, high=1, shape=(self.num_rm_states,), dtype=np.uint8)})
         self.observation_space = self.observation_dict["features"]
-        self.current_rm_id = rm_id
-        self.current_rm    = self.reward_machines[self.current_rm_id]
-        # print("BEGIN LINES")
-        # print("\n".join(self.current_rm.lines))
-        # print("END LINES")
-        # self.after_last_reset = 0
-        # self.after_last_reset_acc = []
+        self.constant_rm_id = rm_id
+        self.env.env.current_rm_id = self.constant_rm_id
+        self.env.env.current_rm    = self.reward_machines[self.current_rm_id]
+        self.env.env.current_u_id  = self.current_rm.reset()
 
     def get_num_rm_states(self):
         return self.env.num_rm_states
@@ -132,60 +124,21 @@ class RewardMachineHidden(gym.Wrapper):
     def is_hidden_rm(self):
         return True
 
-    def get_rm(self):
-        return self.current_rm
-
     def hidden_obs(self, obs):
         obs = gym.spaces.unflatten(self.observation_dict, obs)
         return obs["features"]
 
     def reset(self):
-        # Reseting the environment and selecting the next RM tasks
-        self.obs = self.hidden_obs(self.env.reset())
-        self.current_u_id  = self.current_rm.reset()
-
-        # print()
-
-        # print(f"steps after last reset={self.after_last_reset}")
-        # self.after_last_reset_acc.append(self.after_last_reset)
-        # self.after_last_reset = 0
-        # n = 50
-        # in_acc = len(self.after_last_reset_acc)
-        # last_n = self.after_last_reset_acc[in_acc-n:in_acc]
-        # print(f"rolling average = {int(float(sum(last_n))/float(len(last_n)))}")
-
-        # Adding the RM state to the observation
-        return self.hidden_obs(self.get_observation(self.obs, self.current_rm_id, self.current_u_id, False))
+        obs = self.env.reset()
+        self.env.env.current_rm_id = self.constant_rm_id
+        self.env.env.current_rm    = self.reward_machines[self.current_rm_id]
+        self.env.env.current_u_id  = self.current_rm.reset()
+        return self.hidden_obs(obs)
 
     def step(self, action):
-        # self.after_last_reset += 1
-        # executing the action in the environment
-        next_obs, _original_reward, env_done, info = self.env.step(action)
-
-        next_obs = self.hidden_obs(next_obs)
-
-        # getting the output of the detectors and saving information for generating counterfactual experiences
-        true_props = self.env.get_events()
-        self.crm_params = self.obs, action, next_obs, env_done, true_props, info
-        self.obs = next_obs
-
-        # update the RM state
-        info["true_props"] = true_props
-        self.current_u_id, rm_rew, rm_done = self.current_rm.step(self.current_u_id, true_props, info)
-
-        # if true_props != '':
-        #     print(f"ICARTE: {old_u} -> {self.current_u_id} on {true_props}")
-
-        # if rm_rew != 0.0:
-        #     print(f"got reward on {true_props}, {self.current_u_id}, {rm_done}")
-        #     print(self.current_rm.delta_u)
-        #     print(self.current_rm.delta_r)
-
-        # returning the result of this action
-        done = rm_done or env_done
-
-        return next_obs, rm_rew, done, info
-
+        next_obs, rm_rew, done, info = self.env.step(action)
+        info["true_props"] = self.env.get_events()
+        return self.hidden_obs(next_obs), rm_rew, done, info
 
 class RewardMachineWrapper(gym.Wrapper):
     def __init__(self, env, add_crm, add_rs, gamma, rs_gamma, rm_id):
@@ -210,16 +163,12 @@ class RewardMachineWrapper(gym.Wrapper):
                 rm.add_reward_shaping(gamma, rs_gamma)
         self.current_rm_id = rm_id
         self.current_rm = self.reward_machines[self.current_rm_id]
-        # print("BEGIN LINES")
-        # print("\n".join(self.current_rm.lines))
-        # print("END LINES")
-        # self.after_last_reset = 0
-        # self.after_last_reset_acc = []
-
+        
     def get_num_rm_states(self):
         return self.env.num_rm_states
 
     def reset(self):
+        raise ValueError()
         self.valid_states = None # We use this set to compute RM states that are reachable by the last experience (None means that all of them are reachable!) 
         # Reseting the environment and selecting the next RM tasks
         self.obs = self.env.reset()

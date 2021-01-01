@@ -1,6 +1,8 @@
 from reward_machines.reward_functions import *
 from reward_machines.reward_machine_utils import evaluate_dnf, value_iteration
+
 import time
+import copy
 
 class RewardMachine:
     def __init__(self, file):
@@ -66,6 +68,14 @@ class RewardMachine:
         # This is an auxiliary method used by the HRL baseline to prune "useless" options
         return [self.delta_u[u1][u2].split("&") for u2 in self.delta_u[u1] if u1 != u2]
 
+    def with_initial(self, v):
+        """
+        For reward machine A and state v, return A[v] (RM A with v as its initial state)
+        """
+        new_rm = copy.deepcopy(self)
+        new_rm.u0 = v
+        new_rm.known_transitions = {}
+        return new_rm
 
     # Private methods -----------------------------------
 
