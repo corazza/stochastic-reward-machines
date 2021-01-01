@@ -1,5 +1,5 @@
 from reward_machines.reward_functions import *
-from reward_machines.reward_machine_utils import evaluate_dnf, value_iteration
+from reward_machines.reward_machine_utils import compile_dnf, evaluate_dnf_compiled, value_iteration
 
 import time
 import copy
@@ -10,6 +10,7 @@ class RewardMachine:
         self.U  = []         # list of non-terminal RM states
         self.u0 = None       # initial state
         self.delta_u    = {} # state-transition function
+        self.delta_u_compiled = {} # compiled dnfs
         self.delta_r    = {} # reward-transition function
         self.terminal_u = -1  # All terminal states are sent to the same terminal state with id *-1*
         self._load_reward_machine(file)
@@ -35,7 +36,7 @@ class RewardMachine:
 
     def _compute_next_state(self, u1, true_props):
         for u2 in self.delta_u[u1]:
-            if evaluate_dnf(self.delta_u[u1][u2], true_props):
+            if evaluate_dnf_compiled(self.delta_u_compiled[u1][u2], true_props):
                 return u2
         return self.terminal_u # no transition is defined for true_props
 
@@ -128,7 +129,9 @@ class RewardMachine:
             # Adding state-transition to delta_u
             if u1 not in self.delta_u:
                 self.delta_u[u1] = {}
+                self.delta_u_compiled[u1] = {}
             self.delta_u[u1][u2] = dnf_formula
+            self.delta_u_compiled[u1][u2] = compile_dnf(dnf_formula)
             # Adding reward-transition to delta_r
             if u1 not in self.delta_r:
                 self.delta_r[u1] = {}

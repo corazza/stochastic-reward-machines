@@ -111,13 +111,16 @@ def consistent_hyp(X, n_states_start=2):
 
         g = Glucose4()
         used_pvars = 0
+
         def add_pvar(d, storage, storage_rev):
             nonlocal used_pvars
-            if str(d) in storage_rev:
-                return storage_rev[str(d)]
+            key = d
+            pvar = storage_rev.get(key)
+            if pvar is not None:
+                return pvar
             used_pvars += 1
             storage[used_pvars] = d
-            storage_rev[str(d)] = used_pvars
+            storage_rev[key] = used_pvars
             return used_pvars
 
         def add_pvar_d(d):
@@ -138,33 +141,33 @@ def consistent_hyp(X, n_states_start=2):
         # Phi^{RM}
         for p in all_states():
             for l in language:
-                g.add_clause([add_pvar((p, l, q), prop_d, prop_d_rev) for q in all_states()])
+                g.add_clause([add_pvar_d((p, l, q)) for q in all_states()])
                 for q1 in all_states():
                     for q2 in all_states():
                         if q1==q2:
                             continue
-                        p_l_q1 = add_pvar((p, l, q1), prop_d, prop_d_rev)
-                        p_l_q2 = add_pvar((p, l, q2), prop_d, prop_d_rev)
+                        p_l_q1 = add_pvar_d((p, l, q1))
+                        p_l_q2 = add_pvar_d((p, l, q2))
                         g.add_clause([-p_l_q1, -p_l_q2])
 
         for p in all_states():
             for l in language:
-                g.add_clause([add_pvar((p, l, r), prop_o, prop_o_rev) for r in reward_alphabet])
+                g.add_clause([add_pvar_o((p, l, r)) for r in reward_alphabet])
                 for r1 in reward_alphabet:
                     for r2 in reward_alphabet:
                         if r1 == r2:
                             continue
-                        p_l_r1 = add_pvar((p, l, r1), prop_o, prop_o_rev)
-                        p_l_r2 = add_pvar((p, l, r2), prop_o, prop_o_rev)
+                        p_l_r1 = add_pvar_o((p, l, r1))
+                        p_l_r2 = add_pvar_o((p, l, r2))
                         g.add_clause([-p_l_r1, -p_l_r2])
 
         # Consistency with sample
         # (3)
-        g.add_clause([add_pvar((tuple(), initial_state()), prop_x, prop_x_rev)]) # starts in the initial state
+        g.add_clause([add_pvar_x((tuple(), initial_state()))]) # starts in the initial state
         for p in all_states():
             if p == initial_state():
                 continue
-            g.add_clause([-add_pvar((tuple(), p), prop_x, prop_x_rev)])
+            g.add_clause([-add_pvar_x((tuple(), p))])
 
         # (4)
         for (labels, _rewards) in prefixes(X):
@@ -174,9 +177,9 @@ def consistent_hyp(X, n_states_start=2):
             l = labels[-1]
             for p in all_states():
                 for q in all_states():
-                    x_1 = add_pvar((lm, p), prop_x, prop_x_rev)
-                    d = add_pvar((p, l, q), prop_d, prop_d_rev)
-                    x_2 = add_pvar((labels, q), prop_x, prop_x_rev)
+                    x_1 = add_pvar_x((lm, p))
+                    d = add_pvar_d((p, l, q))
+                    x_2 = add_pvar_x((labels, q))
                     g.add_clause([-x_1, -d, x_2])
 
         # (5)
@@ -187,21 +190,9 @@ def consistent_hyp(X, n_states_start=2):
             l = labels[-1]
             r = rewards[-1]
             for p in all_states():
-                x = add_pvar((lm, p), prop_x, prop_x_rev)
-                o = add_pvar((p, l, r), prop_o, prop_o_rev)
+                x = add_pvar_x((lm, p))
+                o = add_pvar_o((p, l, r))
                 g.add_clause([-x, o])
-
-        # MEALY vs. MOORE in Icarte's overview paper
-        # fix by updating JIRP's definition of a reward machine
-        # ie. d and o -> whatever Icarte uses
-        # for (p, q) in all_pairs(all_states()):
-        #     for (l1, l2) in different_pairs(language):
-        #         for (r1, r2) in different_pairs(reward_alphabet):
-        #             d1 = add_pvar_d((p, l1, q))
-        #             d2 = add_pvar_d((p, l2, q))
-        #             o1 = add_pvar_o((p, l1, r1))
-        #             o2 = add_pvar_o((p, l2, r2))
-        #             g.add_clause([-d1, -d2, -o1, -o2])
 
         g.solve()
         if g.get_model() is None:
@@ -258,12 +249,6 @@ def consistent_hyp(X, n_states_start=2):
                 rm_strings.append(s)
 
         rm_string = "\n".join(rm_strings)
-
-        # print(delta_u)
-        # print(f"begin rm string, n_states={n_states}")
-        # print(rm_string)
-        # print("end rm string")
-
         new_file, filename = tempfile.mkstemp()
         os.write(new_file, rm_string.encode())
         os.close(new_file)
@@ -276,7 +261,6 @@ def initial_hyp():
     return consistent_hyp(set())
 
 def equivalent_on_X(H1, v1, H2, v2, X):
-    print(f"checking eqv for {v1} and {v2}")
     H1 = H1.with_initial(v1)
     H2 = H2.with_initial(v2)
     total = len(X)
@@ -285,9 +269,8 @@ def equivalent_on_X(H1, v1, H2, v2, X):
         if rm_run(labels, H1) == rm_run(labels, H2):
             eqv += 1
     if float(eqv)/total > _EQV_THRESHOLD:
-        print(f"EQUIVALENT (p ~= {float(eqv)/total})")
+        print(f"H1/{v1} ~ H2/{v2} (p ~= {float(eqv)/total})")
         return True
-    print("not equivalent")
     return False
 
 def transfer_Q(H_new, H_old, Q_old, X = {}):

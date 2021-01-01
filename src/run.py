@@ -218,7 +218,20 @@ def main(args):
         rank = MPI.COMM_WORLD.Get_rank()
         configure_logger(args.log_path, format_strs=[])
 
-    model, env = train(args, extra_args)
+    if args.profile_whole is not None:
+        import cProfile, pstats, sys
+        print("will profile whole train call")        
+        pr = cProfile.Profile()
+        pr.enable()
+
+    model, env = train(args, extra_args)    
+
+    if args.profile_whole is not None:
+        pr.disable()
+        ps = pstats.Stats(pr, stream=sys.stdout)
+        ps.strip_dirs()
+        ps.sort_stats(args.profile_whole)
+        ps.print_stats(30)
 
     if args.save_path is not None and rank == 0:
         save_path = osp.expanduser(args.save_path)

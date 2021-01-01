@@ -133,5 +133,6 @@ def common_arg_parser():
     parser.add_argument("--use_self_loops", help="Add option policies for self-loops in the RMs", action="store_true", default=False)
     # JIRP
     parser.add_argument("--rm_hidden", help="Hide RM observations", action="store_true", default=False)
+    parser.add_argument('--profile_whole', help='Profile whole call to train', type=str, default=None)
     parser.add_argument('--rm_id', help="Use this RM", type=int, default=0)
     return parser

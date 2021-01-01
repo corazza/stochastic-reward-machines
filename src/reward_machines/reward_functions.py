@@ -1,5 +1,5 @@
 import math
-from reward_machines.reward_machine_utils import evaluate_dnf
+from reward_machines.reward_machine_utils import compile_dnf, evaluate_dnf_compiled
 
 class RewardFunction:
     def __init__(self):
@@ -40,6 +40,7 @@ class LabelRewardFunction(RewardFunction):
     def __init__(self, label_rewards):
         super().__init__()
         self.label_rewards = label_rewards
+        self.compiled_dnfs = dict([(dnf, compile_dnf(dnf)) for dnf in label_rewards])
 
     def get_type(self):
         return "label"
@@ -47,7 +48,7 @@ class LabelRewardFunction(RewardFunction):
     def get_reward(self, s_info):
         true_props = s_info["true_props"]
         for dnf in self.label_rewards:
-            if evaluate_dnf(dnf, true_props):
+            if evaluate_dnf_compiled(self.compiled_dnfs[dnf], true_props):
                 return self.label_rewards[dnf]
         return 0
 

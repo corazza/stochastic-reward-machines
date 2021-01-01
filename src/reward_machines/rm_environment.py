@@ -104,7 +104,7 @@ class RewardMachineEnv(gym.Wrapper):
 
 
 class RewardMachineHidden(gym.Wrapper):
-    def __init__(self, env, gamma, rs_gamma, rm_id):
+    def __init__(self, env, gamma, rs_gamma, rm_id=None):
         """
         Wrapper for RM envs where the RM is hidden from the observations. Additionally it fixes a
         constant RM for the environment.
@@ -112,9 +112,7 @@ class RewardMachineHidden(gym.Wrapper):
         super().__init__(env)
         self.observation_space = self.observation_dict["features"]
         self.constant_rm_id = rm_id
-        self.env.env.current_rm_id = self.constant_rm_id
-        self.env.env.current_rm    = self.reward_machines[self.current_rm_id]
-        self.env.env.current_u_id  = self.current_rm.reset()
+        self._set_constant_rm()
 
     def get_num_rm_states(self):
         return self.env.num_rm_states
@@ -128,15 +126,19 @@ class RewardMachineHidden(gym.Wrapper):
 
     def reset(self):
         obs = self.env.reset()
-        self.env.env.current_rm_id = self.constant_rm_id
-        self.env.env.current_rm    = self.reward_machines[self.current_rm_id]
-        self.env.env.current_u_id  = self.current_rm.reset()
+        self._set_constant_rm()
         return self.hidden_obs(obs)
 
     def step(self, action):
         next_obs, rm_rew, done, info = self.env.step(action)
         info["true_props"] = self.env.get_events()
         return self.hidden_obs(next_obs), rm_rew, done, info
+
+    def _set_constant_rm(self):
+        if self.constant_rm_id is not None:
+            self.env.env.current_rm_id = self.constant_rm_id
+            self.env.env.current_rm    = self.reward_machines[self.current_rm_id]
+            self.env.env.current_u_id  = self.current_rm.reset()
 
 
 class RewardMachineWrapper(gym.Wrapper):
