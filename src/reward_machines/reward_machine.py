@@ -36,13 +36,13 @@ class RewardMachine:
     def _compute_next_state(self, u1, true_props):
         for u2 in self.delta_u[u1]:
             if evaluate_dnf(self.delta_u[u1][u2], true_props):
-                return (True, u2)
-        return (False, self.terminal_u) # no transition is defined for true_props
+                return u2
+        return self.terminal_u # no transition is defined for true_props
 
     def get_next_state(self, u1, true_props):
         if (u1,true_props) not in self.known_transitions:
-            found_u2 = self._compute_next_state(u1, true_props)
-            self.known_transitions[(u1,true_props)] = found_u2
+            u2 = self._compute_next_state(u1, true_props)
+            self.known_transitions[(u1,true_props)] = u2
         return self.known_transitions[(u1,true_props)]
 
     def step(self, u1, true_props, s_info, add_rs=False, env_done=False):
@@ -53,10 +53,10 @@ class RewardMachine:
 
         # Computing the next state in the RM and checking if the episode is done
         assert u1 != self.terminal_u, "the RM was set to a terminal state!"
-        (found, u2) = self.get_next_state(u1, true_props)
+        u2 = self.get_next_state(u1, true_props)
         done = (u2 == self.terminal_u)
         # Getting the reward
-        rew = self._get_reward(u1,u2,s_info,add_rs, env_done) if found else 0.0
+        rew = self._get_reward(u1,u2,s_info,add_rs, env_done)
         
         return u2, rew, done
 
@@ -110,7 +110,6 @@ class RewardMachine:
         # Reading the file
         f = open(file)
         lines = [l.rstrip() for l in f]
-        self.lines = lines
         f.close()
         # setting the DFA
         self.u0 = eval(lines[0])
@@ -141,7 +140,3 @@ class RewardMachine:
         for u in u_list:
             if u not in self.U and u != self.terminal_u:
                 self.U.append(u)
-
-    def report(self):
-        print(self.delta_u)
-        # print(self.delta_r)

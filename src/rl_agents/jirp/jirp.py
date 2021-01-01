@@ -10,7 +10,7 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 _MAX_N_STATES = 50
-_UPDATE_X_EVERY = 100 # episodes
+_UPDATE_X_EVERY = 200 # episodes
 _USE_TERMINAL_STATE = False
 _EQV_THRESHOLD = 0.95
 

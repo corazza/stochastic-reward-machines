@@ -58,9 +58,7 @@ def learn(env,
 
     # Running Q-Learning
     reward_total = 0
-    total_episodes = 0
     step = 0
-    total_steps = 0
     num_episodes = 0
     Q = {}
     actions = list(range(env.action_space.n))
@@ -94,25 +92,16 @@ def learn(env,
                 else:     _delta = _r + gamma*get_qmax(Q,_sn,actions,q_init) - Q[_s][_a]
                 Q[_s][_a] += lr*_delta
 
-            assert env.current_rm_id == 2
-                
-
             # moving to the next state
             reward_total += r
             step += 1
-            total_steps += 1
             if step%print_freq == 0:
                 logger.record_tabular("steps", step)
-                logger.record_tabular("env rm", env.current_rm_id)
                 logger.record_tabular("episodes", num_episodes)
                 logger.record_tabular("total reward", reward_total)
-                logger.record_tabular("positive / total", str(int(reward_total)) + "/" + str(total_episodes) + f" ({int(100*(reward_total/total_episodes))}%)")
                 logger.dump_tabular()
                 reward_total = 0
-                total_steps = 0
-                total_episodes = 0
             if done:
                 num_episodes += 1
-                total_episodes += 1
                 break
             s = sn

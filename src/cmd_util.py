@@ -20,7 +20,7 @@ from baselines.common import retro_wrappers
 from baselines.common.wrappers import ClipActionsWrapper
 from baselines.common.cmd_util import arg_parser
 
-from reward_machines.rm_environment import RewardMachineWrapper, RewardMachineHidden, HierarchicalRMWrapper, RewardMachineEnv
+from reward_machines.rm_environment import RewardMachineWrapper, HierarchicalRMWrapper, RewardMachineHidden
 
 def make_vec_env(env_id, env_type, num_env, seed, args, 
                  wrapper_kwargs=None,
