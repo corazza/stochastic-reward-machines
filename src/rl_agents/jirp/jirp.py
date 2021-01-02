@@ -4,38 +4,59 @@ JIRP based method
 import os, tempfile
 from collections import defaultdict
 import random, time, copy
+# from profilehooks import profile
 
 from baselines import logger
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
-_MAX_N_STATES = 50
-_UPDATE_X_EVERY = 200 # episodes
-_USE_TERMINAL_STATE = False
-_EQV_THRESHOLD = 0.95
+_MAX_RM_STATES_N = 50
+_UPDATE_X_EVERY_N_EPISODES = 150
+_EQV_THRESHOLD = 0.95 # probability threshold for concluding two states in two different RMs are equivalent
 
 
-def get_qmax(Q,s,actions,q_init):
-    if s not in Q:
-        Q[s] = dict([(a,q_init) for a in actions])
-    return max(Q[s].values())
-
-def get_best_action(Q,s,actions,q_init):
-    qmax = get_qmax(Q,s,actions,q_init)
-    best = [a for a in actions if Q[s][a] == qmax]
-    return random.choice(best)
-
-def rm_run(labels, rm):
-    current_state = rm.reset()
+def rm_run(labels, H):
+    """
+    Returns the output of H when labels is provided as input
+    """
+    current_state = H.reset()
     rewards = []
     for props in labels:
-        current_state, reward, done = rm.step(current_state, props, {"true_props": props})
+        current_state, reward, done = H.step(current_state, props, {"true_props": props})
         rewards.append(reward)
         if done: 
             break
     return rewards
 
+def sample_language(X):
+    """
+    Returns the set of all values for true_props strings for a given counter-example set X
+
+    E.g. the sample language for {(("b", "ab"), (0.0, 1.0)), (("ab", "a", "f"), (0.0, 0.0, 1.0))}
+    is {"", "f", "b", "a", "ab"}.
+    """
+    language = set()
+    language.add("") # always contains empty string
+    for (labels, _rewards) in X:
+        language.update(labels)
+    return language
+
+def sample_reward_alphabet(X):
+    """
+    Returns the set of all reward values that appear in X
+    """
+    alphabet = set()
+    alphabet.add(0.0) # always includes 0
+    for (_labels, rewards) in X:
+        alphabet.update(rewards)
+    return alphabet
+
 def dnf_for_empty(language):
+    """
+    Returns the "neutral" CNF for a given sample language
+
+    Convenience method. Needed when forming DNFs. Works on the result of sample_language(X).
+    """
     L = set()
     for labels in language:
         if labels == "":
@@ -43,20 +64,6 @@ def dnf_for_empty(language):
         for label in labels:
             L.add("!" + str(label))
     return "&".join(L)
-
-def sample_language(X):
-    language = set()
-    language.add("")
-    for (labels, _rewards) in X:
-        language.update(labels)
-    return language
-
-def sample_reward_alphabet(X):
-    alphabet = set()
-    alphabet.add(0.0)
-    for (_labels, rewards) in X:
-        alphabet.update(rewards)
-    return alphabet
 
 def prefixes(X):
     yield ((), ()) # (\epsilon, \epsilon) \in Pref(X)
@@ -84,33 +91,28 @@ def different_pairs_ordered(xs):
         for j in range(i+1, len(xs)):
             yield (xs[i], xs[j])
 
+# @profile
 def consistent_hyp(X, n_states_start=2):
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
 
     from pysat.solvers import Glucose4
-    for n_states in range(n_states_start, _MAX_N_STATES+1):
+    for n_states in range(n_states_start, _MAX_RM_STATES_N+1):
         print(f"finding model with {n_states} states")
-        def terminal_state():
-            return 1 if _USE_TERMINAL_STATE else None
         def initial_state():
-            return 1 if not _USE_TERMINAL_STATE else 2
+            return 1
         def all_states():
             return range(initial_state(), n_states+1)
 
-        # maps SAT's propvar (int) to (p: state, l: labels, q: state)
-        prop_d = dict()
+        prop_d = dict() # maps SAT's propvar (int) to (p: state, l: labels, q: state)
         prop_d_rev = dict()
-        # maps SAT's propvar (int) to (p: state, l: labels, r: reward)
-        prop_o = dict()
+        prop_o = dict() # maps SAT's propvar (int) to (p: state, l: labels, r: reward)
         prop_o_rev = dict()
-        # maps SAT's propvar (int) to (l: labels, q: state)
-        prop_x = dict()
+        prop_x = dict() # maps SAT's propvar (int) to (l: labels, q: state)
         prop_x_rev = dict()
-
-        g = Glucose4()
-        used_pvars = 0
+        used_pvars = 0 # p. var. counter
+        g = Glucose4() # solver
 
         def add_pvar(d, storage, storage_rev):
             nonlocal used_pvars
@@ -138,7 +140,8 @@ def consistent_hyp(X, n_states_start=2):
             nonlocal prop_x_rev
             return add_pvar(x, prop_x, prop_x_rev)
 
-        # Phi^{RM}
+        # Encoding reward machines
+        # (1)
         for p in all_states():
             for l in language:
                 g.add_clause([add_pvar_d((p, l, q)) for q in all_states()])
@@ -150,6 +153,7 @@ def consistent_hyp(X, n_states_start=2):
                         p_l_q2 = add_pvar_d((p, l, q2))
                         g.add_clause([-p_l_q1, -p_l_q2])
 
+        # (2)
         for p in all_states():
             for l in language:
                 g.add_clause([add_pvar_o((p, l, r)) for r in reward_alphabet])
@@ -200,7 +204,7 @@ def consistent_hyp(X, n_states_start=2):
         
         print("found")
 
-        transitions = defaultdict(lambda: [None, None])
+        transitions = defaultdict(lambda: [None, None]) # maps (state, true_props) to (state, reward)
         for pvar in g.get_model():
             if abs(pvar) in prop_d:
                 if pvar > 0:
@@ -233,10 +237,7 @@ def consistent_hyp(X, n_states_start=2):
             else:
                 delta_r[p][q].append((conj, r))
         
-        if _USE_TERMINAL_STATE:
-            rm_strings = [f"{initial_state()}", f"[{terminal_state()}]"]
-        else:
-            rm_strings = [f"{initial_state()}", f"[]"]
+        rm_strings = [f"{initial_state()}", f"[]"]
     
         for p in delta_u:
             for q in delta_u[p]:
@@ -255,12 +256,12 @@ def consistent_hyp(X, n_states_start=2):
 
         return RewardMachine(filename), n_states
 
-    raise ValueError("Couldn't find machine with at most {} states".format(_MAX_N_STATES))
-
-def initial_hyp():
-    return consistent_hyp(set())
+    raise ValueError(f"Couldn't find machine with at most {_MAX_RM_STATES_N} states")
 
 def equivalent_on_X(H1, v1, H2, v2, X):
+    """
+    Checks if state v1 from RM H1 is equivalent to v2 from H2
+    """
     H1 = H1.with_initial(v1)
     H2 = H2.with_initial(v2)
     total = len(X)
@@ -269,18 +270,19 @@ def equivalent_on_X(H1, v1, H2, v2, X):
         if rm_run(labels, H1) == rm_run(labels, H2):
             eqv += 1
     if float(eqv)/total > _EQV_THRESHOLD:
-        print(f"H1/{v1} ~ H2/{v2} (p ~= {float(eqv)/total})")
+        print(f"H_new/{v1} ~ H_old/{v2} (p ~= {float(eqv)/total})")
         return True
     return False
 
 def transfer_Q(H_new, H_old, Q_old, X = {}):
     """
-    Determine if two states of H_old and H_new are equivalent by checking
-    their output on label sequences recorded in X. Although the thm. requires
-    the outputs be the same on _all_ label sequences, choosing probably
-    equivalent states may be good enough.
+    Returns new set of q-functions, indexed by states of H_new, where
+    some of the q-functions may have been transfered from H_old if the
+    respective states were determined to be equivalent
+    
+    Although the thm. requires the outputs be the same on _all_ label sequences,
+    choosing probably equivalent states may be good enough.
     """
-    # initialize new Q
     Q = dict()
     Q[-1] = dict() # (-1 is the index of the terminal state) (TODO check if necessary)
     for v in H_new.get_states():
@@ -293,11 +295,24 @@ def transfer_Q(H_new, H_old, Q_old, X = {}):
     return Q
 
 def initial_Q(H):
+    """
+    Returns a set of uninitialized q-functions indexed by states of RM H
+    """
     Q = dict()
     Q[-1] = dict()
     for v in H.get_states():
         Q[v] = dict()
     return Q
+
+def get_qmax(Q, s, actions, q_init):
+    if s not in Q:
+        Q[s] = dict([(a,q_init) for a in actions])
+    return max(Q[s].values())
+
+def get_best_action(Q, s, actions, q_init):
+    qmax = get_qmax(Q,s,actions,q_init)
+    best = [a for a in actions if Q[s][a] == qmax]
+    return random.choice(best)
 
 def learn(env,
           network=None,
@@ -320,14 +335,13 @@ def learn(env,
     num_episodes = 0
     actions = list(range(env.action_space.n))
 
-    H, n_states_last = initial_hyp()
+    H, n_states_last = consistent_hyp(set())
 
     Q = initial_Q(H)
     X = set()
     X_new = set()
     labels = []
     rewards = []
-    percentages = []
 
     while step < total_timesteps:
         s = tuple(env.reset())
@@ -376,7 +390,6 @@ def learn(env,
                 logger.record_tabular("total reward", reward_total)
                 logger.record_tabular("positive / total", str(int(reward_total)) + "/" + str(total_episodes) + f" ({int(100*(reward_total/total_episodes))}%)")
                 logger.dump_tabular()
-                percentages.append(int(100*(reward_total/total_episodes)))
                 reward_total = 0
                 total_episodes = 0
             if done:
@@ -384,7 +397,7 @@ def learn(env,
                 total_episodes += 1
                 if rm_run(labels, H) != rewards:
                     X_new.add((tuple(labels), tuple(rewards)))
-                if num_episodes % _UPDATE_X_EVERY == 0 and X_new:
+                if num_episodes % _UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
                     X.update(X_new)

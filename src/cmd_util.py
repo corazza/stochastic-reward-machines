@@ -82,7 +82,7 @@ def make_env(env_id, env_type, args, mpi_rank=0, subrank=0, seed=None, reward_sc
 
     if args.use_rs or args.use_crm:
         assert not args.rm_hidden
-        env = RewardMachineWrapper(env, args.use_crm, args.use_rs, args.gamma, args.rs_gamma, args.rm_id)
+        env = RewardMachineWrapper(env, args.use_crm, args.use_rs, args.gamma, args.rs_gamma)
 
     if args.rm_hidden:
         assert not (args.use_rs or args.use_crm)
