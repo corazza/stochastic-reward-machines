@@ -12,7 +12,9 @@ from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 _MAX_RM_STATES_N = 50
 _UPDATE_X_EVERY_N_EPISODES = 150
-_EQV_THRESHOLD = 0.95 # probability threshold for concluding two states in two different RMs are equivalent
+_EQV_THRESHOLD = 0.95 # probability threshold for concluding two
+                      # states in two different RMs are equivalent
+_INITIAL_STATE = 1 # 0 is internally used for the terminal state
 
 
 def rm_run(labels, H):
@@ -53,9 +55,11 @@ def sample_reward_alphabet(X):
 
 def dnf_for_empty(language):
     """
-    Returns the "neutral" CNF for a given sample language
+    Returns the "neutral" CNF for a given sample language corresponding
+    to no events being true
 
-    Convenience method. Needed when forming DNFs. Works on the result of sample_language(X).
+    Convenience method. Works on the result of sample_language(X).
+    Semantically equivalent to \epsilon, but needed when forming DNFs
     """
     L = set()
     for labels in language:
@@ -91,8 +95,35 @@ def different_pairs_ordered(xs):
         for j in range(i+1, len(xs)):
             yield (xs[i], xs[j])
 
+def all_states(n_states):
+    return range(_INITIAL_STATE, n_states+1)
+
+def add_pvar(storage, storage_rev, used_pvars, subscript):
+    """
+    Records a propositional variable indexed with the subscript by assigning it a unique
+    index used by the solver. Returns this index
+
+    If the variable indexed with that subscript was already recorded, no mutation is done,
+    while the index is still returned.
+    """
+    key = subscript
+    pvar = storage_rev.get(key)
+    if pvar is not None:
+        return pvar
+    used_pvars[0] += 1
+    storage[used_pvars[0]] = subscript
+    storage_rev[key] = used_pvars[0]
+    return used_pvars[0]
+
 # @profile
 def consistent_hyp(X, n_states_start=2):
+    """
+    Finds a reward machine consistent with counterexample set X. Returns the RM
+    and its number of states
+
+    n_states_start makes the search start from machines with that number of states.
+    Used to optimize succeeding search calls.
+    """
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
@@ -100,10 +131,6 @@ def consistent_hyp(X, n_states_start=2):
     from pysat.solvers import Glucose4
     for n_states in range(n_states_start, _MAX_RM_STATES_N+1):
         print(f"finding model with {n_states} states")
-        def initial_state():
-            return 1
-        def all_states():
-            return range(initial_state(), n_states+1)
 
         prop_d = dict() # maps SAT's propvar (int) to (p: state, l: labels, q: state)
         prop_d_rev = dict()
@@ -111,42 +138,32 @@ def consistent_hyp(X, n_states_start=2):
         prop_o_rev = dict()
         prop_x = dict() # maps SAT's propvar (int) to (l: labels, q: state)
         prop_x_rev = dict()
-        used_pvars = 0 # p. var. counter
+        used_pvars = [0] # p. var. counter
         g = Glucose4() # solver
 
-        def add_pvar(d, storage, storage_rev):
-            nonlocal used_pvars
-            key = d
-            pvar = storage_rev.get(key)
-            if pvar is not None:
-                return pvar
-            used_pvars += 1
-            storage[used_pvars] = d
-            storage_rev[key] = used_pvars
-            return used_pvars
-
+        # convenience methods
         def add_pvar_d(d):
             nonlocal prop_d
             nonlocal prop_d_rev
-            return add_pvar(d, prop_d, prop_d_rev)
+            return add_pvar(prop_d, prop_d_rev, used_pvars, d)
 
         def add_pvar_o(o):
             nonlocal prop_o
             nonlocal prop_o_rev
-            return add_pvar(o, prop_o, prop_o_rev)
+            return add_pvar(prop_o, prop_o_rev, used_pvars, o)
 
         def add_pvar_x(x):
             nonlocal prop_x
             nonlocal prop_x_rev
-            return add_pvar(x, prop_x, prop_x_rev)
+            return add_pvar(prop_x, prop_x_rev, used_pvars, x)
 
         # Encoding reward machines
         # (1)
-        for p in all_states():
+        for p in all_states(n_states):
             for l in language:
-                g.add_clause([add_pvar_d((p, l, q)) for q in all_states()])
-                for q1 in all_states():
-                    for q2 in all_states():
+                g.add_clause([add_pvar_d((p, l, q)) for q in all_states(n_states)])
+                for q1 in all_states(n_states):
+                    for q2 in all_states(n_states):
                         if q1==q2:
                             continue
                         p_l_q1 = add_pvar_d((p, l, q1))
@@ -154,7 +171,7 @@ def consistent_hyp(X, n_states_start=2):
                         g.add_clause([-p_l_q1, -p_l_q2])
 
         # (2)
-        for p in all_states():
+        for p in all_states(n_states):
             for l in language:
                 g.add_clause([add_pvar_o((p, l, r)) for r in reward_alphabet])
                 for r1 in reward_alphabet:
@@ -167,9 +184,9 @@ def consistent_hyp(X, n_states_start=2):
 
         # Consistency with sample
         # (3)
-        g.add_clause([add_pvar_x((tuple(), initial_state()))]) # starts in the initial state
-        for p in all_states():
-            if p == initial_state():
+        g.add_clause([add_pvar_x((tuple(), _INITIAL_STATE))]) # starts in the initial state
+        for p in all_states(n_states):
+            if p == _INITIAL_STATE:
                 continue
             g.add_clause([-add_pvar_x((tuple(), p))])
 
@@ -179,8 +196,8 @@ def consistent_hyp(X, n_states_start=2):
                 continue
             lm = labels[0:-1]
             l = labels[-1]
-            for p in all_states():
-                for q in all_states():
+            for p in all_states(n_states):
+                for q in all_states(n_states):
                     x_1 = add_pvar_x((lm, p))
                     d = add_pvar_d((p, l, q))
                     x_2 = add_pvar_x((labels, q))
@@ -193,7 +210,7 @@ def consistent_hyp(X, n_states_start=2):
             lm = labels[0:-1]
             l = labels[-1]
             r = rewards[-1]
-            for p in all_states():
+            for p in all_states(n_states):
                 x = add_pvar_x((lm, p))
                 o = add_pvar_o((p, l, r))
                 g.add_clause([-x, o])
@@ -237,7 +254,7 @@ def consistent_hyp(X, n_states_start=2):
             else:
                 delta_r[p][q].append((conj, r))
         
-        rm_strings = [f"{initial_state()}", f"[]"]
+        rm_strings = [f"{_INITIAL_STATE}", f"[]"]
     
         for p in delta_u:
             for q in delta_u[p]:
@@ -325,18 +342,15 @@ def learn(env,
           q_init=1.0,
           use_crm=False,
           use_rs=False):
-    # JIRP doesn't work with explicit RMs
-    assert env.is_hidden_rm()
+    assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
 
-    # Running Q-Learning
     reward_total = 0
     total_episodes = 0
     step = 0
     num_episodes = 0
-    actions = list(range(env.action_space.n))
 
     H, n_states_last = consistent_hyp(set())
-
+    actions = list(range(env.action_space.n))
     Q = initial_Q(H)
     X = set()
     X_new = set()

@@ -1,6 +1,6 @@
 from reward_machines.reward_functions import *
 from reward_machines.reward_machine_utils import value_iteration
-from rl_agents.jirp.reward_functions import *
+from rl_agents.jirp.label_reward_function import LabelRewardFunction
 from rl_agents.jirp.dnf_compile import compile_dnf, evaluate_dnf_compiled
 
 import time
