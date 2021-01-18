@@ -4,7 +4,7 @@ JIRP based method
 import os, tempfile
 from collections import defaultdict
 import random, time, copy
-# from profilehooks import profile
+from profilehooks import profile
 
 from baselines import logger
 from reward_machines.reward_machine import RewardMachine
@@ -115,7 +115,7 @@ def add_pvar(storage, storage_rev, used_pvars, subscript):
     storage_rev[key] = used_pvars[0]
     return used_pvars[0]
 
-# @profile
+@profile
 def consistent_hyp(X, n_states_start=2):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
