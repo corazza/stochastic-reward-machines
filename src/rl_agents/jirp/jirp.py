@@ -1,121 +1,163 @@
 """
 JIRP based method
 """
-import os, tempfile
-from collections import defaultdict
+import math
+import itertools
 import random, time, copy
 from profilehooks import profile
 
+from mip import *
 from baselines import logger
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
-_MAX_RM_STATES_N = 50
-_UPDATE_X_EVERY_N_EPISODES = 150
-_EQV_THRESHOLD = 0.95 # probability threshold for concluding two
-                      # states in two different RMs are equivalent
-_INITIAL_STATE = 1 # 0 is internally used for the terminal state
+from rl_agents.jirp.util import *
+from rl_agents.jirp.consts import *
 
+def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
+    def delta_A(p_a, a):
+        a = tuple(a)
+        if (p_a, a) in transitions:
+            return transitions[(p_a, a)][0]
+        else:
+            return TERMINAL_STATE
+    def sigma_A(p_a, a):
+        a = tuple(a)
+        if (p_a, a) in transitions:
+            return transitions[(p_a, a)][1]
+        else:
+            return 0.0
 
-def rm_run(labels, H):
-    """
-    Returns the output of H when labels is provided as input
-    """
-    current_state = H.reset()
-    rewards = []
-    for props in labels:
-        current_state, reward, done = H.step(current_state, props, {"true_props": props})
-        rewards.append(reward)
-        if done: 
-            break
-    return rewards
+    def all_states_here(asdf):
+        return all_states(asdf)
 
-def sample_language(X):
-    """
-    Returns the set of all values for true_props strings for a given counter-example set X
+    language = sample_language(X)
+    reward_alphabet = sample_reward_alphabet(X)
 
-    E.g. the sample language for {(("b", "ab"), (0.0, 1.0)), (("ab", "a", "f"), (0.0, 0.0, 1.0))}
-    is {"", "f", "b", "a", "ab"}.
-    """
-    language = set()
-    language.add("") # always contains empty string
-    for (labels, _rewards) in X:
-        language.update(labels)
-    return language
+    r_ub = 5*max(reward_alphabet)
+    r_lb = 5*min(reward_alphabet)
+    epsilon_ub = 50.0
 
-def sample_reward_alphabet(X):
-    """
-    Returns the set of all reward values that appear in X
-    """
-    alphabet = set()
-    alphabet.add(0.0) # always includes 0
-    for (_labels, rewards) in X:
-        alphabet.update(rewards)
-    return alphabet
+    m = Model()
+    # m.verbose = 0
+    m.emphasis = 1
+    m.threads = -1
 
-def dnf_for_empty(language):
-    """
-    Returns the "neutral" CNF for a given sample language corresponding
-    to no events being true
+    # epsilon = m.add_var(ub=epsilon_ub)
+    epsilon = m.add_var(var_type=CONTINUOUS)
+    m.objective = minimize(epsilon)
 
-    Convenience method. Works on the result of sample_language(X).
-    Semantically equivalent to \epsilon, but needed when forming DNFs
-    """
-    L = set()
-    for labels in language:
-        if labels == "":
+    d_dict = dict()
+    x_dict = dict()
+    o_dict = dict()
+    y_dict = dict()
+    z_dict = dict()
+
+    for p in all_states_here(n_states):
+        for a in language:
+            # o_dict[(p, a)] = m.add_var(var_type=CONTINUOUS, lb=r_lb, ub=r_ub)
+            o_dict[(p, a)] = m.add_var(var_type=CONTINUOUS)
+
+    for p in all_states_here(n_states):
+        for p_a in all_states_here(n_states_A):
+            # y_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS, lb=-epsilon_ub, ub=epsilon_ub)
+            # z_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS, lb=-epsilon_ub, ub=epsilon_ub)
+            y_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS)
+            z_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS)
+
+    for p in all_states_here(n_states):
+        for q in all_states_here(n_states):
+            for a in language:
+                d_dict[(p, a, q)] = m.add_var(var_type=BINARY)
+
+    for p_a in all_states_here(n_states_A):
+        for p in all_states_here(n_states):
+            x_dict[(p_a, p)] = m.add_var(var_type=BINARY)
+
+    # TODO remove
+    # for q in all_states(n_states):
+    #     x_dict[(TERMINAL_STATE, q)] = m.add_var(var_type=INTEGER)
+    #     y_dict[(TERMINAL_STATE, q)] = m.add_var(lb=-math.inf)
+    #     z_dict[(TERMINAL_STATE, q)] = m.add_var(lb=-math.inf)
+
+    # (i)
+    m += epsilon >= 0
+
+    # (ii)
+    # for p in all_states_here(n_states):
+    #     for q in all_states_here(n_states):
+    #         for a in language:
+    #             m += 0 <= d_dict[(p, a, q)] <= 1
+
+    # (iii)
+    for p in all_states_here(n_states):
+        for a in language:
+            m += xsum(d_dict[(p, a, q)] for q in all_states_here(n_states)) == 1
+
+    # (iv)
+    # for p_a in all_states_here(n_states_A):
+    #     for p in all_states_here(n_states):
+    #         m += 0 <= x_dict[(p_a, p)] <= 1
+
+    # (v)
+    m += x_dict[(INITIAL_STATE, INITIAL_STATE)] == 1
+    
+    for p in all_states_here(n_states):
+        for q in all_states_here(n_states):
+            for p_a in all_states_here(n_states_A):
+                for a in language:
+                    q_a = delta_A(p_a, a)
+                    if q_a == TERMINAL_STATE:
+                        continue
+                    x_p = x_dict[(p_a, p)]
+                    x_q = x_dict[(q_a, q)]
+                    d = d_dict[(p, a, q)]
+                    # (vi)
+                    m += x_p + d - x_q <= 1
+                    # (vii)
+                    y_p = y_dict[(p_a, p)]
+                    y_q = y_dict[(q_a, q)]
+                    o = o_dict[(p, a)]
+                    o_A = sigma_A(p_a, a)
+                    # print(f"o={o}, o_A={o_A} (p={p}, q={q}, p_a={p_a}, a={a})")
+                    # m += M*x_p + M*d - (y_q - (y_p + (o_A - o))) <= 2*M
+                    m += M*d - (y_q - (y_p + (o_A - o))) <= M+0.02
+                    # (viii)
+                    z_p = z_dict[(p_a, p)]
+                    z_q = z_dict[(q_a, q)]
+                    # m += M*x_p + M*d - ((z_p + (o_A - o)) - z_q) <= 2*M
+                    m += M*d - ((z_p + (o_A - o)) - z_q) <= M+0.02
+    
+    # (ix)
+    for p in all_states_here(n_states):
+        for p_a in all_states_here(n_states_A):
+            m += z_dict[(p_a, p)] <= y_dict[(p_a, p)]
+
+    # (x)
+    m += z_dict[(INITIAL_STATE, INITIAL_STATE)] <= 0
+    m += y_dict[(INITIAL_STATE, INITIAL_STATE)] >= 0
+
+    for p in all_states_here(n_states):
+        for p_a in all_states_here(n_states_A):
+            # (xi)
+            m += y_dict[(p_a, p)] <= epsilon
+            # (xii)
+            m += -epsilon <= z_dict[(p_a, p)]
+
+    print(f"Starting MLIP solving, n_states={n_states}, n_states_A={n_states_A}")
+    m.optimize()
+    print(f"Done, epsilon={epsilon.x}")
+
+    mtransitions = dict()
+    for (p, a, q) in d_dict:
+        if p == TERMINAL_STATE or q == TERMINAL_STATE or d_dict[(p, a, q)].x is None:
             continue
-        for label in labels:
-            L.add("!" + str(label))
-    return "&".join(L)
+        if d_dict[(p, a, q)].x > 0:
+            o = o_dict[(p, a)].x
+            mtransitions[(p, tuple(a))] = [q, o]
+    return rm_from_transitions(mtransitions, empty_transition)
 
-def prefixes(X):
-    yield ((), ()) # (\epsilon, \epsilon) \in Pref(X)
-    for (labels, rewards) in X:
-        for i in range(1, len(labels)+1):
-            yield (labels[0:i], rewards[0:i])
-
-def all_pairs(xs):
-    xs = list(xs)
-    for i in range(0, len(xs)):
-        for j in range(0, len(xs)):
-            yield (xs[i], xs[j])
-
-def different_pairs(xs):
-    xs = list(xs)
-    for i in range(0, len(xs)):
-        for j in range(0, len(xs)):
-            if i == j:
-                continue
-            yield (xs[i], xs[j])
-
-def different_pairs_ordered(xs):
-    xs = list(xs)
-    for i in range(0, len(xs)):
-        for j in range(i+1, len(xs)):
-            yield (xs[i], xs[j])
-
-def all_states(n_states):
-    return range(_INITIAL_STATE, n_states+1)
-
-def add_pvar(storage, storage_rev, used_pvars, subscript):
-    """
-    Records a propositional variable indexed with the subscript by assigning it a unique
-    index used by the solver. Returns this index
-
-    If the variable indexed with that subscript was already recorded, no mutation is done,
-    while the index is still returned.
-    """
-    key = subscript
-    pvar = storage_rev.get(key)
-    if pvar is not None:
-        return pvar
-    used_pvars[0] += 1
-    storage[used_pvars[0]] = subscript
-    storage_rev[key] = used_pvars[0]
-    return used_pvars[0]
-
-@profile
+# @profile
 def consistent_hyp(X, n_states_start=2):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
@@ -129,7 +171,7 @@ def consistent_hyp(X, n_states_start=2):
     reward_alphabet = sample_reward_alphabet(X)
 
     from pysat.solvers import Glucose4
-    for n_states in range(n_states_start, _MAX_RM_STATES_N+1):
+    for n_states in range(n_states_start, MAX_RM_STATES_N+1):
         print(f"finding model with {n_states} states")
 
         prop_d = dict() # maps SAT's propvar (int) to (p: state, l: labels, q: state)
@@ -184,9 +226,9 @@ def consistent_hyp(X, n_states_start=2):
 
         # Consistency with sample
         # (3)
-        g.add_clause([add_pvar_x((tuple(), _INITIAL_STATE))]) # starts in the initial state
+        g.add_clause([add_pvar_x((tuple(), INITIAL_STATE))]) # starts in the initial state
         for p in all_states(n_states):
-            if p == _INITIAL_STATE:
+            if p == INITIAL_STATE:
                 continue
             g.add_clause([-add_pvar_x((tuple(), p))])
 
@@ -221,59 +263,35 @@ def consistent_hyp(X, n_states_start=2):
         
         print("found")
 
-        transitions = defaultdict(lambda: [None, None]) # maps (state, true_props) to (state, reward)
+        transitions = dict() #defaultdict(lambda: [None, None]) # maps (state, true_props) to (state, reward)
+
         for pvar in g.get_model():
             if abs(pvar) in prop_d:
                 if pvar > 0:
                     (p, l, q) = prop_d[abs(pvar)]
-                    assert transitions[(p, tuple(l))][0] is None
+                    # assert transitions[(p, tuple(l))][0] is None
+                    if (p, tuple(l)) not in transitions:
+                        transitions[(p, tuple(l))] = [None, None]
                     transitions[(p, tuple(l))][0] = q
-                    assert q is not None
+                    # assert q is not None
             elif abs(pvar) in prop_o:
                 if pvar > 0:
                     (p, l, r) = prop_o[abs(pvar)]
-                    assert transitions[(p, tuple(l))][1] is None
+                    if (p, tuple(l)) not in transitions:
+                        transitions[(p, tuple(l))] = [None, None]
+                    # assert transitions[(p, tuple(l))][1] is None
                     transitions[(p, tuple(l))][1] = r
             elif abs(pvar) in prop_x:
                 pass
             else:
                 raise ValueError("Uknown p-var dict")
 
-        delta_u = defaultdict(dict)
-        delta_r = defaultdict(dict)
+        mlip_n_states = n_states - 1 if n_states >= 6 else n_states
+        return mlip_hyp(X, mlip_n_states, n_states, transitions, empty_transition), n_states
 
-        for (p, l) in transitions:
-            (q, r) = transitions[(p, l)]
-            conj = "&".join(l) or empty_transition
-            if q not in delta_u[p]:
-                delta_u[p][q] = conj
-            else:
-                delta_u[p][q] = delta_u[p][q] + "|" + conj
-            if q not in delta_r[p]:
-                delta_r[p][q] = [(conj, r)]
-            else:
-                delta_r[p][q].append((conj, r))
-        
-        rm_strings = [f"{_INITIAL_STATE}", f"[]"]
-    
-        for p in delta_u:
-            for q in delta_u[p]:
-                rs = "{"
-                for (label, reward) in delta_r[p][q]:
-                    rs += f"'{label}': {reward},"
-                rs += "}"
-                rs = f"LabelRewardFunction({rs})"
-                s = "({},{},'{}',{})".format(p, q, delta_u[p][q], rs)
-                rm_strings.append(s)
+        # return rm_from_transitions(transitions, empty_transition), n_states
 
-        rm_string = "\n".join(rm_strings)
-        new_file, filename = tempfile.mkstemp()
-        os.write(new_file, rm_string.encode())
-        os.close(new_file)
-
-        return RewardMachine(filename), n_states
-
-    raise ValueError(f"Couldn't find machine with at most {_MAX_RM_STATES_N} states")
+    raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
 
 def equivalent_on_X(H1, v1, H2, v2, X):
     """
@@ -286,7 +304,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         if rm_run(labels, H1) == rm_run(labels, H2):
             eqv += 1
-    if float(eqv)/total > _EQV_THRESHOLD:
+    if float(eqv)/total > EQV_THRESHOLD:
         print(f"H_new/{v1} ~ H_old/{v2} (p ~= {float(eqv)/total})")
         return True
     return False
@@ -310,26 +328,6 @@ def transfer_Q(H_new, H_old, Q_old, X = {}):
                 Q[v] = copy.deepcopy(Q_old[u])
                 break
     return Q
-
-def initial_Q(H):
-    """
-    Returns a set of uninitialized q-functions indexed by states of RM H
-    """
-    Q = dict()
-    Q[-1] = dict()
-    for v in H.get_states():
-        Q[v] = dict()
-    return Q
-
-def get_qmax(Q, s, actions, q_init):
-    if s not in Q:
-        Q[s] = dict([(a,q_init) for a in actions])
-    return max(Q[s].values())
-
-def get_best_action(Q, s, actions, q_init):
-    qmax = get_qmax(Q,s,actions,q_init)
-    best = [a for a in actions if Q[s][a] == qmax]
-    return random.choice(best)
 
 def learn(env,
           network=None,
@@ -401,17 +399,20 @@ def learn(env,
             if step%print_freq == 0:
                 logger.record_tabular("steps", step)
                 logger.record_tabular("episodes", num_episodes)
+                logger.record_tabular("n states", len(H.U))
+                logger.record_tabular("len(X_new)", len(X_new))
                 logger.record_tabular("total reward", reward_total)
                 logger.record_tabular("positive / total", str(int(reward_total)) + "/" + str(total_episodes) + f" ({int(100*(reward_total/total_episodes))}%)")
                 logger.dump_tabular()
                 reward_total = 0
                 total_episodes = 0
             if done:
+                # print("DONE")
                 num_episodes += 1
                 total_episodes += 1
                 if rm_run(labels, H) != rewards:
                     X_new.add((tuple(labels), tuple(rewards)))
-                if num_episodes % _UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
+                if num_episodes % UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
                     X.update(X_new)
