@@ -32,19 +32,17 @@ def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
         return all_states(asdf)
 
     language = sample_language(X)
-    reward_alphabet = sample_reward_alphabet(X)
 
-    r_ub = 5*max(reward_alphabet)
-    r_lb = 5*min(reward_alphabet)
-    epsilon_ub = 50.0
+    reward_bound = 100.0
+    epsilon_bound = 100.0
+    interval_bound = 1000.0
 
     m = Model()
     # m.verbose = 0
     m.emphasis = 1
     m.threads = -1
 
-    # epsilon = m.add_var(ub=epsilon_ub)
-    epsilon = m.add_var(var_type=CONTINUOUS)
+    epsilon = m.add_var(var_type=CONTINUOUS, ub=epsilon_bound)
     m.objective = minimize(epsilon)
 
     d_dict = dict()
@@ -55,15 +53,12 @@ def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
 
     for p in all_states_here(n_states):
         for a in language:
-            # o_dict[(p, a)] = m.add_var(var_type=CONTINUOUS, lb=r_lb, ub=r_ub)
-            o_dict[(p, a)] = m.add_var(var_type=CONTINUOUS)
+            o_dict[(p, a)] = m.add_var(var_type=CONTINUOUS, lb=-reward_bound, ub=reward_bound)
 
     for p in all_states_here(n_states):
         for p_a in all_states_here(n_states_A):
-            # y_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS, lb=-epsilon_ub, ub=epsilon_ub)
-            # z_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS, lb=-epsilon_ub, ub=epsilon_ub)
-            y_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS)
-            z_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS)
+            y_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS, lb=-interval_bound, ub=interval_bound)
+            z_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS, lb=-interval_bound, ub=interval_bound)
 
     for p in all_states_here(n_states):
         for q in all_states_here(n_states):
@@ -76,7 +71,7 @@ def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
 
     # TODO remove
     # for q in all_states(n_states):
-    #     x_dict[(TERMINAL_STATE, q)] = m.add_var(var_type=INTEGER)
+    #     x_dict[(TERMINAL_STATE, q)] = m.add_var(var_type=BINARY)
     #     y_dict[(TERMINAL_STATE, q)] = m.add_var(lb=-math.inf)
     #     z_dict[(TERMINAL_STATE, q)] = m.add_var(lb=-math.inf)
 
@@ -119,14 +114,11 @@ def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
                     y_q = y_dict[(q_a, q)]
                     o = o_dict[(p, a)]
                     o_A = sigma_A(p_a, a)
-                    # print(f"o={o}, o_A={o_A} (p={p}, q={q}, p_a={p_a}, a={a})")
-                    # m += M*x_p + M*d - (y_q - (y_p + (o_A - o))) <= 2*M
-                    m += M*d - (y_q - (y_p + (o_A - o))) <= M+0.02
+                    m += M*x_p + M*d - (y_q - (y_p + (o_A - o))) <= 2*M
                     # (viii)
                     z_p = z_dict[(p_a, p)]
                     z_q = z_dict[(q_a, q)]
-                    # m += M*x_p + M*d - ((z_p + (o_A - o)) - z_q) <= 2*M
-                    m += M*d - ((z_p + (o_A - o)) - z_q) <= M+0.02
+                    m += M*x_p + M*d - ((z_p + (o_A - o)) - z_q) <= 2*M
     
     # (ix)
     for p in all_states_here(n_states):
@@ -155,6 +147,8 @@ def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
         if d_dict[(p, a, q)].x > 0:
             o = o_dict[(p, a)].x
             mtransitions[(p, tuple(a))] = [q, o]
+
+    display_transitions(mtransitions)
     return rm_from_transitions(mtransitions, empty_transition)
 
 # @profile
@@ -286,7 +280,7 @@ def consistent_hyp(X, n_states_start=2):
             else:
                 raise ValueError("Uknown p-var dict")
 
-        mlip_n_states = n_states - 1 if n_states >= 6 else n_states
+        mlip_n_states = n_states - 0 if n_states >= 6 else n_states
         return mlip_hyp(X, mlip_n_states, n_states, transitions, empty_transition), n_states
 
         # return rm_from_transitions(transitions, empty_transition), n_states

@@ -2,6 +2,7 @@ import random
 import itertools
 import os, tempfile
 from collections import defaultdict
+from graphviz import Digraph
 
 from reward_machines.reward_machine import RewardMachine
 
@@ -162,3 +163,20 @@ def get_best_action(Q, s, actions, q_init):
     qmax = get_qmax(Q,s,actions,q_init)
     best = [a for a in actions if Q[s][a] == qmax]
     return random.choice(best)
+
+def display_transitions(transitions):
+    dot = Digraph()
+
+    nodes = set()
+
+    for (p, a) in transitions:
+        if p not in nodes:
+            nodes.add(p)
+            dot.node(str(p))
+
+    for (p, a) in transitions:
+        [q, r] = transitions[(p, a)]
+        
+        dot.edge(str(p), str(q), label=f"({a}, {r})")
+
+    # dot.render('graphviz/asdf.gv', view=True)
