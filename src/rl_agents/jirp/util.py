@@ -21,6 +21,17 @@ def rm_run(labels, H):
             break
     return rewards
 
+def run_approx_eqv(output1, output2):
+    """
+    Returns True if outputs are approximately equivalent
+    """
+    if len(output1) != len(output2):
+        return False
+    for i in range(0, len(output1)):
+        if abs(output1[i] - output2[i]) > SMT_EPSILON:
+            return False
+    return True
+
 def sample_language(X):
     """
     Returns the set of all values for true_props strings for a given counter-example set X
@@ -164,8 +175,8 @@ def get_best_action(Q, s, actions, q_init):
     best = [a for a in actions if Q[s][a] == qmax]
     return random.choice(best)
 
-def display_transitions(transitions):
-    dot = Digraph()
+def display_transitions(transitions, name):
+    dot = Digraph(comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
 
     nodes = set()
 
@@ -176,7 +187,7 @@ def display_transitions(transitions):
 
     for (p, a) in transitions:
         [q, r] = transitions[(p, a)]
-        
-        dot.edge(str(p), str(q), label=f"({a}, {r})")
-
-    # dot.render('graphviz/asdf.gv', view=True)
+        r = 0.0 if r == 0.0 else r
+        dot.edge(str(p), str(q), label=f"({''.join(a)}, {('%f' % r).rstrip('0').rstrip('.')})")
+    dot = dot.unflatten()
+    dot.render(f"graphviz/{name}.gv", view=True)
