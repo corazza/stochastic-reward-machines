@@ -1,5 +1,5 @@
 MAX_RM_STATES_N = 50
-UPDATE_X_EVERY_N_EPISODES = 1000
+UPDATE_X_EVERY_N_EPISODES = 50
 EQV_THRESHOLD = 0.95 # probability threshold for concluding two
                       # states in two different RMs are equivalent
 INITIAL_STATE = 1

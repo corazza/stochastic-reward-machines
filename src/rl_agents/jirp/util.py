@@ -32,6 +32,17 @@ def run_approx_eqv(output1, output2):
             return False
     return True
 
+def run_sum_approx_eqv(output1, output2):
+    """
+    Returns True if output sums are approximately equivalent
+    """
+    sum1 = sum(output1)
+    sum2 = sum(output2)
+    if abs(sum1 - sum2) > SMT_EPSILON:
+        print(sum1, sum2)
+    return abs(sum1 - sum2) <= SMT_EPSILON
+
+
 def sample_language(X):
     """
     Returns the set of all values for true_props strings for a given counter-example set X

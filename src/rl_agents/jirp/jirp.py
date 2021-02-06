@@ -132,7 +132,10 @@ def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition):
             if is_true(model[d_dict[(p, a, q)]]):
                 print(f"{o_dict[(p, a)]} /// {model[o_dict[(p, a)]]}")
                 o = model[o_dict[(p, a)]]
-                o = float(o.numerator_as_long())/float(o.denominator_as_long())
+                if o is not None:
+                    o = float(o.numerator_as_long())/float(o.denominator_as_long())
+                else:
+                    o = 0 # solver doesn't care (?)
                 stransitions[(p, tuple(a))] = [q, o]
 
         display_transitions(transitions, f"original{n_states}-{n_states_A}")
@@ -448,7 +451,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         output1 = rm_run(labels, H1)
         output2 = rm_run(labels, H2)
-        if run_approx_eqv(output1, output2):
+        if run_sum_approx_eqv(output1, output2):
             eqv += 1
         # if rm_run(labels, H1) == rm_run(labels, H2):
         #     eqv += 1
@@ -559,8 +562,9 @@ def learn(env,
                 num_episodes += 1
                 total_episodes += 1
                 # if rm_run(labels, H) != rewards:
-                if not run_approx_eqv(rm_run(labels, H), rewards):
+                if not run_sum_approx_eqv(rm_run(labels, H), rewards):
                     X_new.add((tuple(labels), tuple(rewards)))
+
                 if num_episodes % UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
