@@ -5,6 +5,7 @@ import math
 import itertools
 import random, time, copy
 from profilehooks import profile
+import random
 
 from pysat.solvers import Glucose4
 from baselines import logger
@@ -213,7 +214,7 @@ def transfer_Q(H_new, H_old, Q_old, X = {}):
         Q[v] = dict()
         # find probably equivalent state u in H_old
         for u in H_old.get_states():
-            if equivalent_on_X(H_new, v, H_old, u, X):
+            if equivalent_on_X(H_new, v, H_old, u, X) and u in Q_old:
                 Q[v] = copy.deepcopy(Q_old[u])
                 break
     return Q
@@ -225,7 +226,8 @@ def prune_X(X, transitions, n_states):
     found = True
     while found:
         found = False
-        for i in range(0, len(X_result)):
+        for i in range(0, min(X_PRUNE_MAX, len(X_result))):
+            i = random.randint(0, len(X_result)-1)
             X_candidate = list(X_result)
             X_candidate.pop(i)
             X_candidate = set(X_candidate)
@@ -353,5 +355,7 @@ def learn(env,
                     Q = transfer_Q(H_new, H, Q, X)
                     # if len(X) > X_PRUNE_MIN_SIZE:
                     #     X = prune_X(X, transitions, n_states_last)
+                    if n_states_last >= 3:
+                        exit()
                 break
             s = sn

@@ -87,7 +87,7 @@ def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition, rep
                     o = o_dict[(p, a)]
                     o_A = sigma_A(p_a, a)
                     # (3)
-                    # s.add(Implies(And(x_p, d), x_q))
+                    s.add(Implies(And(x_p, d), x_q))
                     # (4)
                     s.add(Implies(And(x_p, d), y_q >= y_p + (o_A - o)))
                     # s.add(Implies(d, y_q >= y_p + (o_A - o)))
@@ -140,7 +140,7 @@ def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition, rep
             display_transitions(stransitions, f"approximation{n_states}-{n_states_A}")
             print(f"transitions for n_states={n_states}")
             print("transitions:", transitions)
-            print("mtransitions:", stransitions)
+            print("stransitions:", stransitions)
         
         # return rm_from_transitions(stransitions, empty_transition)
         return stransitions

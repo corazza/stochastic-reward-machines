@@ -5,5 +5,6 @@ EQV_THRESHOLD = 0.95 # probability threshold for concluding two
 INITIAL_STATE = 1
 TERMINAL_STATE = -1
 M = 100000.0
-SMT_EPSILON = 1e-7
+SMT_EPSILON = 1e-6
 X_PRUNE_MIN_SIZE = 3
+X_PRUNE_MAX = 20
