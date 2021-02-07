@@ -6,294 +6,19 @@ import itertools
 import random, time, copy
 from profilehooks import profile
 
-from mip import *
+from pysat.solvers import Glucose4
 from baselines import logger
+
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
-from z3 import *
-
-
 from rl_agents.jirp.util import *
 from rl_agents.jirp.consts import *
+from rl_agents.jirp.mip_hyp import mlip_hyp
+from rl_agents.jirp.smt_hyp import smt_hyp
 
-def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition):
-    def delta_A(p_a, a):
-        a = tuple(a)
-        if (p_a, a) in transitions:
-            return transitions[(p_a, a)][0]
-        else:
-            return TERMINAL_STATE
-    def sigma_A(p_a, a):
-        a = tuple(a)
-        if (p_a, a) in transitions:
-            return transitions[(p_a, a)][1]
-        else:
-            return 0.0
-
-    def all_states_here(asdf):
-        return all_states(asdf)
-
-    language = sample_language(X)
-
-    d_dict = dict()
-    x_dict = dict()
-    o_dict = dict()
-    y_dict = dict()
-    z_dict = dict()
-
-    s = Solver()
-
-    for p in all_states_here(n_states):
-        for a in language:
-            o_dict[(p, a)] = Real(f"o/{p}-{a}")
-
-    for p in all_states_here(n_states):
-        for a in language:
-            for q in all_states_here(n_states):
-                d_dict[(p, a, q)] = Bool(f"d/{p}-{a}-{q}")
-
-    for p_A in all_states_here(n_states_A):
-        for p in all_states_here(n_states):
-            x_dict[(p_A, p)] = Bool(f"x/{p_A}-{p}")
-            y_dict[(p_A, p)] = Real(f"y/{p_A}-{p}")
-            z_dict[(p_A, p)] = Real(f"z/{p_A}-{p}")
-
-    # (1)
-    for p in all_states_here(n_states):
-        for a in language:
-            disj = []
-            for q in all_states_here(n_states):
-                disj.append(d_dict[(p, a, q)])
-            disj = Or(*disj)
-            s.add(disj)
-
-    for p in all_states_here(n_states):
-        for a in language:
-            for q1 in all_states_here(n_states):
-                for q2 in all_states_here(n_states):
-                    if q1 == q2:
-                        continue
-                    s.add(Or(Not(d_dict[(p, a, q1)]), Not(d_dict[(p, a, q2)])))
-
-    # (2)
-    s.add(x_dict[(INITIAL_STATE, INITIAL_STATE)])
-
-    for p in all_states_here(n_states):
-        for q in all_states_here(n_states):
-            for p_a in all_states_here(n_states_A):
-                for a in language:
-                    q_a = delta_A(p_a, a)
-                    if q_a == TERMINAL_STATE:
-                        continue
-                    x_p = x_dict[(p_a, p)]
-                    x_q = x_dict[(q_a, q)]
-                    d = d_dict[(p, a, q)]
-                    y_p = y_dict[(p_a, p)]
-                    y_q = y_dict[(q_a, q)]
-                    z_p = z_dict[(p_a, p)]
-                    z_q = z_dict[(q_a, q)]
-                    o = o_dict[(p, a)]
-                    o_A = sigma_A(p_a, a)
-                    # (3)
-                    s.add(Implies(And(x_p, d), x_q))
-                    # (4)
-                    s.add(Implies(And(x_p, d), y_q >= y_p + (o_A - o)))
-                    # (5)
-                    s.add(Implies(And(x_p, d), z_q <= z_p + (o_A - o)))
-
-    # (6)
-    for p_A in all_states_here(n_states_A):
-        for p in all_states_here(n_states):
-            z_p = z_dict[(p_a, p)]
-            y_p = y_dict[(p_a, p)]
-            s.add(z_p <= y_p)
-
-    # (7)
-    z_qi = z_dict[(INITIAL_STATE, INITIAL_STATE)]
-    y_qi = y_dict[(INITIAL_STATE, INITIAL_STATE)]
-    s.add(z_qi <= 0, y_qi >= 0)
-
-    # (8)
-    for p_A in all_states_here(n_states_A):
-        for p in all_states_here(n_states):
-            y_p = y_dict[(p_a, p)]
-            z_p = z_dict[(p_a, p)]
-            s.add(z_p >= -epsilon, y_p <= epsilon)
-
-    print(f"SMT SOLVING ({n_states}/{n_states_A}, epsilon={epsilon})")
-    result = s.check()
-    print(result)
-    if result == sat:
-        model = s.model()
-        stransitions = dict()
-        for (p, a, q) in d_dict:
-            if p == TERMINAL_STATE or q == TERMINAL_STATE:
-                continue
-            if is_true(model[d_dict[(p, a, q)]]):
-                print(f"{o_dict[(p, a)]} /// {model[o_dict[(p, a)]]}")
-                o = model[o_dict[(p, a)]]
-                if o is not None:
-                    o = float(o.numerator_as_long())/float(o.denominator_as_long())
-                else:
-                    o = 0 # solver doesn't care (?)
-                stransitions[(p, tuple(a))] = [q, o]
-
-        display_transitions(transitions, f"original{n_states}-{n_states_A}")
-        display_transitions(stransitions, f"approximation{n_states}-{n_states_A}")
-        print(f"transitions for n_states={n_states}")
-        print("transitions:", transitions)
-        print("mtransitions:", stransitions)
-        
-        return rm_from_transitions(stransitions, empty_transition)
-    else:
-        return None
-
-def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
-    def delta_A(p_a, a):
-        a = tuple(a)
-        if (p_a, a) in transitions:
-            return transitions[(p_a, a)][0]
-        else:
-            return TERMINAL_STATE
-    def sigma_A(p_a, a):
-        a = tuple(a)
-        if (p_a, a) in transitions:
-            return transitions[(p_a, a)][1]
-        else:
-            return 0.0
-
-    def all_states_here(asdf):
-        return all_states(asdf)
-
-    language = sample_language(X)
-
-    reward_bound = 1000.0
-    epsilon_bound = 1000.0
-    interval_bound = 10000.0
-
-    m = Model()
-    # m.verbose = 0
-    # m.emphasis = 1
-    m.threads = -1
-    m.pump_passes = 300
-
-    epsilon = m.add_var(var_type=CONTINUOUS, ub=epsilon_bound)
-    m.objective = minimize(epsilon)
-
-    d_dict = dict()
-    x_dict = dict()
-    o_dict = dict()
-    y_dict = dict()
-    z_dict = dict()
-
-    for p in all_states_here(n_states):
-        for a in language:
-            o_dict[(p, a)] = m.add_var(var_type=CONTINUOUS, lb=-reward_bound, ub=reward_bound)
-
-    for p in all_states_here(n_states):
-        for p_a in all_states_here(n_states_A):
-            x_dict[(p_a, p)] = m.add_var(var_type=BINARY)
-            y_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS, lb=-interval_bound, ub=interval_bound)
-            z_dict[(p_a, p)] = m.add_var(var_type=CONTINUOUS, lb=-interval_bound, ub=interval_bound)
-
-    for p in all_states_here(n_states):
-        for q in all_states_here(n_states):
-            for a in language:
-                d_dict[(p, a, q)] = m.add_var(var_type=BINARY)
-
-    # TODO remove
-    # for q in all_states(n_states):
-    #     x_dict[(TERMINAL_STATE, q)] = m.add_var(var_type=BINARY)
-    #     y_dict[(TERMINAL_STATE, q)] = m.add_var(lb=-math.inf)
-    #     z_dict[(TERMINAL_STATE, q)] = m.add_var(lb=-math.inf)
-
-    # (i)
-    m += epsilon >= 0
-
-    # (ii)
-    # for p in all_states_here(n_states):
-    #     for q in all_states_here(n_states):
-    #         for a in language:
-    #             m += 0 <= d_dict[(p, a, q)] <= 1
-
-    # (iii)
-    for p in all_states_here(n_states):
-        for a in language:
-            m += xsum(d_dict[(p, a, q)] for q in all_states_here(n_states)) == 1
-
-    # (iv)
-    # for p_a in all_states_here(n_states_A):
-    #     for p in all_states_here(n_states):
-    #         m += 0 <= x_dict[(p_a, p)] <= 1
-
-    # (v)
-    m += x_dict[(INITIAL_STATE, INITIAL_STATE)] == 1
-    
-    for p in all_states_here(n_states):
-        for q in all_states_here(n_states):
-            for p_a in all_states_here(n_states_A):
-                for a in language:
-                    q_a = delta_A(p_a, a)
-                    if q_a == TERMINAL_STATE:
-                        continue
-                    x_p = x_dict[(p_a, p)]
-                    x_q = x_dict[(q_a, q)]
-                    d = d_dict[(p, a, q)]
-                    # (vi)
-                    m += x_p + d - x_q <= 1
-                    # (vii)
-                    y_p = y_dict[(p_a, p)]
-                    y_q = y_dict[(q_a, q)]
-                    o = o_dict[(p, a)]
-                    o_A = sigma_A(p_a, a)
-                    m += M*x_p + M*d - (y_q - (y_p + (o_A - o))) <= 2*M
-                    # (viii)
-                    z_p = z_dict[(p_a, p)]
-                    z_q = z_dict[(q_a, q)]
-                    m += M*x_p + M*d - ((z_p + (o_A - o)) - z_q) <= 2*M
-    
-    # (ix)
-    for p in all_states_here(n_states):
-        for p_a in all_states_here(n_states_A):
-            m += z_dict[(p_a, p)] <= y_dict[(p_a, p)]
-
-    # (x)
-    m += z_dict[(INITIAL_STATE, INITIAL_STATE)] <= 0
-    m += y_dict[(INITIAL_STATE, INITIAL_STATE)] >= 0
-
-    for p in all_states_here(n_states):
-        for p_a in all_states_here(n_states_A):
-            # (xi)
-            m += y_dict[(p_a, p)] <= epsilon
-            # (xii)
-            m += -epsilon <= z_dict[(p_a, p)]
-
-    print(f"Starting MLIP solving, n_states={n_states}, n_states_A={n_states_A}")
-    m.optimize()
-    print(f"Done, epsilon={epsilon.x}")
-
-    if epsilon.x > 0:
-        m.preprocess = 0
-        m.optimize()
-        print(f"Done new, epsilon={epsilon.x}")
-
-    mtransitions = dict()
-    for (p, a, q) in d_dict:
-        if p == TERMINAL_STATE or q == TERMINAL_STATE or d_dict[(p, a, q)].x is None:
-            continue
-        if d_dict[(p, a, q)].x > 0:
-            o = o_dict[(p, a)].x
-            mtransitions[(p, tuple(a))] = [q, o]
-
-    display_transitions(transitions, f"original{n_states}-{n_states_A}")
-    display_transitions(mtransitions, f"approximation{n_states}-{n_states_A}")
-    print(f"transitions for n_states={n_states}")
-    print("transitions:", transitions)
-    print("mtransitions:", mtransitions)
-    return rm_from_transitions(mtransitions, empty_transition)
 
 # @profile
-def consistent_hyp(X, n_states_start=2):
+def consistent_hyp(X, n_states_start=2, report=True):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
     and its number of states
@@ -305,9 +30,9 @@ def consistent_hyp(X, n_states_start=2):
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
 
-    from pysat.solvers import Glucose4
     for n_states in range(n_states_start, MAX_RM_STATES_N+1):
-        print(f"finding model with {n_states} states")
+        if report:
+            print(f"finding model with {n_states} states")
 
         prop_d = dict() # maps SAT's propvar (int) to (p: state, l: labels, q: state)
         prop_d_rev = dict()
@@ -396,7 +121,8 @@ def consistent_hyp(X, n_states_start=2):
         if g.get_model() is None:
             continue
         
-        print("found")
+        if report:
+            print("found")
 
         transitions = dict() #defaultdict(lambda: [None, None]) # maps (state, true_props) to (state, reward)
 
@@ -421,21 +147,33 @@ def consistent_hyp(X, n_states_start=2):
             else:
                 raise ValueError("Uknown p-var dict")
 
-        # mlip_n_states = n_states - 1 if n_states >= 4 else n_states
+        # mlip_n_states = n_states - 1 if n_states >= 3 else n_states
         # return mlip_hyp(X, mlip_n_states, n_states, transitions, empty_transition), n_states
 
-
-        # if n_states >= 2:
+        # if n_states >= 3:
         #     for i in range(2, n_states):
         #         minimized_rm = smt_hyp(SMT_EPSILON, X, i, n_states, transitions, empty_transition)
         #         if minimized_rm:
         #             print(f"FOUND MINIMIZED RM {i} < {n_states} (epsilon={SMT_EPSILON})")
+        #             # exit()
         #             return minimized_rm, n_states
+            # test_transitions = dict()
+            # test_transitions[(1, 'a')] = [2, 0]
+            # test_transitions[(2, 'a')] = [3, 0]
+            # test_transitions[(3, 'a')] = [1, 0]
+            # minimized_rm = smt_hyp(SMT_EPSILON, X, 2, 3, test_transitions, empty_transition)
+            # if minimized_rm:
+            #     print(f"FOUND MINIMIZED RM")
+            #     print(minimized_rm.delta_u)
+            #     print()
+            #     print(minimized_rm.delta_r)
+            #     exit()
+            #     return minimized_rm, n_states
 
         # print("couldn't find minimized RM, returning exact")
 
-
-        return smt_hyp(SMT_EPSILON, X, n_states, n_states, transitions, empty_transition), n_states
+        g.delete()
+        return smt_hyp(SMT_EPSILON, X, n_states, n_states, transitions, empty_transition, report), n_states
         # return rm_from_transitions(transitions, empty_transition), n_states
 
     raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
@@ -480,6 +218,35 @@ def transfer_Q(H_new, H_old, Q_old, X = {}):
                 break
     return Q
 
+def prune_X(X, transitions, n_states):
+    print("pruning X")
+    X_result = set(X)
+    # n_states = len(H.U)
+    found = True
+    while found:
+        found = False
+        for i in range(0, len(X_result)):
+            X_candidate = list(X_result)
+            X_candidate.pop(i)
+            X_candidate = set(X_candidate)
+            transitions_new, _ = consistent_hyp(X_candidate, n_states, report=False)
+            # equivalent = True
+            # for (labels, rewards) in X:
+            #     H_output = rm_run(labels, H)
+            #     H_new_output = rm_run(labels, H_new)
+            #     if H_output != H_new_output:
+            #         equivalent = False
+            if isomorphic(transitions, transitions_new, n_states):
+                found = True
+                X_result = X_candidate
+                print(f"removed counterexample ({len(X_result)}/{len(X)})")
+                # exit()
+                break
+        if len(X_result) <= X_PRUNE_MIN_SIZE:
+            break
+    print(f"new size is {len(X_result)}")
+    return X_result
+
 def learn(env,
           network=None,
           seed=None,
@@ -498,13 +265,18 @@ def learn(env,
     step = 0
     num_episodes = 0
 
-    H, n_states_last = consistent_hyp(set())
-    actions = list(range(env.action_space.n))
-    Q = initial_Q(H)
     X = set()
     X_new = set()
     labels = []
     rewards = []
+
+    transitions, n_states_last = consistent_hyp(set())
+    language = sample_language(X)
+    empty_transition = dnf_for_empty(language)
+    H = rm_from_transitions(transitions, empty_transition)
+
+    actions = list(range(env.action_space.n))
+    Q = initial_Q(H)
 
     while step < total_timesteps:
         s = tuple(env.reset())
@@ -570,10 +342,16 @@ def learn(env,
                     print(f"len(X_new)={len(X_new)}")
                     X.update(X_new)
                     X_new = set()
-                    H_new, n_states_last = consistent_hyp(X, n_states_last)
+                    language = sample_language(X)
+                    empty_transition = dnf_for_empty(language)
+                    transitions_new, n_states_last = consistent_hyp(X, n_states_last)
                     # if n_states_last >= 3:
                     #     exit()
-                    Q = transfer_Q(H_new, H, Q, X)
+                    H_new = rm_from_transitions(transitions_new, empty_transition)
                     H = H_new
+                    transitions = transitions_new
+                    Q = transfer_Q(H_new, H, Q, X)
+                    # if len(X) > X_PRUNE_MIN_SIZE:
+                    #     X = prune_X(X, transitions, n_states_last)
                 break
             s = sn

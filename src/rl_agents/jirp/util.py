@@ -38,8 +38,8 @@ def run_sum_approx_eqv(output1, output2):
     """
     sum1 = sum(output1)
     sum2 = sum(output2)
-    if abs(sum1 - sum2) > SMT_EPSILON:
-        print(sum1, sum2)
+    # if abs(sum1 - sum2) > SMT_EPSILON:
+    #     print(sum1, sum2)
     return abs(sum1 - sum2) <= SMT_EPSILON
 
 
@@ -202,3 +202,12 @@ def display_transitions(transitions, name):
         dot.edge(str(p), str(q), label=f"({''.join(a)}, {('%f' % r).rstrip('0').rstrip('.')})")
     dot = dot.unflatten()
     dot.render(f"graphviz/{name}.gv", view=True)
+
+def isomorphic(t1, t2, n_states):
+    for bij in itertools.permutations(range(1, n_states+1)):
+        bij = zip(bij, range(1, n_states+1))
+        bij = {i[0]: i[1] for i in bij}
+        t2_bij = {(bij[key[0]], key[1]): [bij[value[0]], value[1]] for key, value in t2.items()}
+        if t2_bij == t1:
+            return True
+    return False
