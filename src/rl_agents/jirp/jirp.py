@@ -172,7 +172,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
 
         if n_states >= 2:
             for i in range(2, n_states):
-                minimized_rm = smt_hyp(MINIMIZATION_EPSILON, X, i, n_states, transitions, empty_transition, report=False)
+                minimized_rm = smt_hyp(MINIMIZATION_EPSILON, language, i, n_states, transitions, empty_transition, report=True)
                 if minimized_rm:
                     print(f"FOUND MINIMIZED RM {i} < {n_states} (epsilon={SMT_EPSILON})")
                     display_transitions(transitions, f"original-{i}-{n_states}")
@@ -323,7 +323,7 @@ def learn(env,
             sn, r, done, info = env.step(a)
 
             if random.random() <= NOISE_PROB and r == 1:
-                direction = 1.0 if random.random() <= 0.5 else -1.0
+                direction = 1.0 if random.random() <= 0.5 else 1.0
                 r += NOISE * direction
 
             sn = tuple(sn)

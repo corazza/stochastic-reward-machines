@@ -133,10 +133,10 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
     result = s.check()
     if report:
         print(result)
-    if result == unsat:
-            import IPython
-            IPython.embed()
-            exit()
+    # if result == unsat:
+    #         import IPython
+    #         IPython.embed()
+    #         exit()
     if result == sat:
         model = s.model()
         stransitions = dict()
@@ -162,7 +162,7 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
             if value[1] < -0.5:
                 print("FOUNDFOUNDFOUND")
                 print("FOUNDFOUNDFOUND")
-                print("FOUNDFOUNDFOUND")                
+                print("FOUNDFOUNDFOUND")
 
         if inspect:
             display_transitions(transitions, "given")
