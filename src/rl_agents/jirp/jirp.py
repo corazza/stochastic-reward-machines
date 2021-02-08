@@ -5,7 +5,6 @@ import math
 import itertools
 import random, time, copy
 from profilehooks import profile
-import random
 
 from pysat.solvers import Glucose4
 from baselines import logger
@@ -60,13 +59,16 @@ def consistent_hyp(X, n_states_start=2, report=True):
             nonlocal prop_x_rev
             return add_pvar(prop_x, prop_x_rev, used_pvars, x)
 
+        def all_states_here(asdf):
+            return all_states_terminal(asdf)
+
         # Encoding reward machines
         # (1)
-        for p in all_states(n_states):
+        for p in all_states_here(n_states):
             for l in language:
-                g.add_clause([add_pvar_d((p, l, q)) for q in all_states(n_states)])
-                for q1 in all_states(n_states):
-                    for q2 in all_states(n_states):
+                g.add_clause([add_pvar_d((p, l, q)) for q in all_states_here(n_states)])
+                for q1 in all_states_here(n_states):
+                    for q2 in all_states_here(n_states):
                         if q1==q2:
                             continue
                         p_l_q1 = add_pvar_d((p, l, q1))
@@ -74,7 +76,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
                         g.add_clause([-p_l_q1, -p_l_q2])
 
         # (2)
-        for p in all_states(n_states):
+        for p in all_states_here(n_states):
             for l in language:
                 g.add_clause([add_pvar_o((p, l, r)) for r in reward_alphabet])
                 for r1 in reward_alphabet:
@@ -88,7 +90,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
         # Consistency with sample
         # (3)
         g.add_clause([add_pvar_x((tuple(), INITIAL_STATE))]) # starts in the initial state
-        for p in all_states(n_states):
+        for p in all_states_here(n_states):
             if p == INITIAL_STATE:
                 continue
             g.add_clause([-add_pvar_x((tuple(), p))])
@@ -99,8 +101,8 @@ def consistent_hyp(X, n_states_start=2, report=True):
                 continue
             lm = labels[0:-1]
             l = labels[-1]
-            for p in all_states(n_states):
-                for q in all_states(n_states):
+            for p in all_states_here(n_states):
+                for q in all_states_here(n_states):
                     x_1 = add_pvar_x((lm, p))
                     d = add_pvar_d((p, l, q))
                     x_2 = add_pvar_x((labels, q))
@@ -113,23 +115,27 @@ def consistent_hyp(X, n_states_start=2, report=True):
             lm = labels[0:-1]
             l = labels[-1]
             r = rewards[-1]
-            for p in all_states(n_states):
+            for p in all_states_here(n_states):
                 x = add_pvar_x((lm, p))
                 o = add_pvar_o((p, l, r))
                 g.add_clause([-x, o])
         
         # (Termination)
         for (labels, rewards) in X:
-            if labels == ():
+            x = add_pvar_x((labels, TERMINAL_STATE))
+            g.add_clause([x])
+        
+        for p in all_states_here(n_states):
+            if p == TERMINAL_STATE:
                 continue
-            lm = labels[0:-1]
-            l = labels[-1]
-            for p in all_states(n_states):
-                x_1 = add_pvar_x((lm, p))
-                d = add_pvar_d((p, l, TERMINAL_STATE))
-                x_2 = add_pvar_x((labels, TERMINAL_STATE))
-                print(f"added ({lm}, {p}) ^ ({p}, {l}, {TERMINAL_STATE}) -> ({labels}, {TERMINAL_STATE})")
-                g.add_clause([-x_1, -d, x_2])
+            for l in language:
+                d = add_pvar_d((TERMINAL_STATE, l, p))
+                g.add_clause([-d])
+
+        for p in all_states_here(n_states):
+            for l in language:
+                o = add_pvar_o((TERMINAL_STATE, l, 0.0))
+                g.add_clause([o])
 
         g.solve()
         if g.get_model() is None:
@@ -166,28 +172,37 @@ def consistent_hyp(X, n_states_start=2, report=True):
 
         if n_states >= 2:
             for i in range(2, n_states):
-                minimized_rm = smt_hyp(MINIMIZATION_EPSILON, X, i, n_states, transitions, empty_transition)
+                minimized_rm = smt_hyp(MINIMIZATION_EPSILON, X, i, n_states, transitions, empty_transition, report=False)
                 if minimized_rm:
                     print(f"FOUND MINIMIZED RM {i} < {n_states} (epsilon={SMT_EPSILON})")
-                    # exit()
+                    display_transitions(transitions, f"original-{i}-{n_states}")
+                    display_transitions(minimized_rm, f"approximation-{i}-{n_states}")
+                    print(transitions)
+                    print(minimized_rm)
+                    exit()
                     return minimized_rm, n_states
+
             # test_transitions = dict()
-            # test_transitions[(1, 'a')] = [2, 0]
-            # test_transitions[(2, 'a')] = [3, 0]
-            # test_transitions[(3, 'a')] = [1, 0]
-            # minimized_rm = smt_hyp(SMT_EPSILON, X, 2, 3, test_transitions, empty_transition)
+            # test_transitions[(1, ('a',))] = [2, 0]
+            # test_transitions[(1, ('b',))] = [3, 0]
+            # test_transitions[(2, ('a',))] = [4, 0]
+            # test_transitions[(3, ('a',))] = [5, 0]
+            # test_transitions[(4, ('a',))] = [-1, 1.1]
+            # test_transitions[(5, ('a',))] = [-1, 0.9]
+            # minimized_rm = smt_hyp(MINIMIZATION_EPSILON, {"a", "b"}, 3, 5, test_transitions, empty_transition, inspect=True)
             # if minimized_rm:
             #     print(f"FOUND MINIMIZED RM")
-            #     print(minimized_rm.delta_u)
-            #     print()
-            #     print(minimized_rm.delta_r)
-            #     exit()
+            #     print(minimized_rm)
             #     return minimized_rm, n_states
+            # exit()
 
         print("couldn't find minimized RM, returning exact")
 
         g.delete()
-        return smt_hyp(SMT_EPSILON, X, n_states, n_states, transitions, empty_transition, report), n_states
+        return smt_hyp(SMT_EPSILON, language, n_states, n_states, transitions, empty_transition, report), n_states
+        # display_transitions(transitions, f"test{n_states}")
+
+        # return transitions, n_states
         # return rm_from_transitions(transitions, empty_transition), n_states
 
     raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
@@ -307,10 +322,15 @@ def learn(env,
             a = random.choice(actions) if random.random() < epsilon else get_best_action(Q[rm_state],s,actions,q_init)
             sn, r, done, info = env.step(a)
 
+            if random.random() <= NOISE_PROB and r == 1:
+                direction = 1.0 if random.random() <= 0.5 else -1.0
+                r += NOISE * direction
+
             sn = tuple(sn)
             true_props = env.get_events()
             labels.append(true_props) # L(s, a, s')
-            next_rm_state, _rm_reward, _rm_done = H.step(rm_state, true_props, info)
+            next_rm_state, _rm_reward, rm_done = H.step(rm_state, true_props, info)
+
 
             # update Q-function of current RM state
             if s not in Q[rm_state]: Q[rm_state][s] = dict([(b, q_init) for b in actions])
@@ -328,7 +348,8 @@ def learn(env,
                 else:    _delta = h_r + gamma*get_qmax(Q[v_next], sn, actions, q_init) - Q[v][s][a]
                 Q[v][s][a] += lr*_delta
 
-            rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
+            if not rm_done:
+                rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
 
             # moving to the next state
             reward_total += r

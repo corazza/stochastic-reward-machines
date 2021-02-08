@@ -199,7 +199,9 @@ def display_transitions(transitions, name):
     for (p, a) in transitions:
         [q, r] = transitions[(p, a)]
         r = 0.0 if r == 0.0 else r
-        dot.edge(str(p), str(q), label=f"({''.join(a)}, {('%f' % r).rstrip('0').rstrip('.')})")
+        # dot.edge(str(p), str(q), label=f"({''.join(map(str, a))}, {('%f' % r).rstrip('0').rstrip('.')})")
+        dot.edge(str(p), str(q), label=f"{str(a)}, {('%f' % r).rstrip('0').rstrip('.')})")
+        
     dot = dot.unflatten()
     dot.render(f"graphviz/{name}.gv", view=True)
 
