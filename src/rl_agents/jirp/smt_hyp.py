@@ -9,16 +9,16 @@ from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 last_displayed_states = 0
 
 def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition, report=True):
-    def delta_A(p_a, a):
+    def delta_A(p_A, a):
         a = tuple(a)
-        if (p_a, a) in transitions:
-            return transitions[(p_a, a)][0]
+        if (p_A, a) in transitions:
+            return transitions[(p_A, a)][0]
         else:
             return TERMINAL_STATE
-    def sigma_A(p_a, a):
+    def sigma_A(p_A, a):
         a = tuple(a)
-        if (p_a, a) in transitions:
-            return transitions[(p_a, a)][1]
+        if (p_A, a) in transitions:
+            return transitions[(p_A, a)][1]
         else:
             return 0.0
 
@@ -72,20 +72,20 @@ def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition, rep
 
     for p in all_states_here(n_states):
         for q in all_states_here(n_states):
-            for p_a in all_states_here(n_states_A):
+            for p_A in all_states_here(n_states_A):
                 for a in language:
-                    q_a = delta_A(p_a, a)
-                    if q_a == TERMINAL_STATE:
-                        continue
-                    x_p = x_dict[(p_a, p)]
+                    q_a = delta_A(p_A, a)
+                    # if q_a == TERMINAL_STATE:
+                    #     continue
+                    x_p = x_dict[(p_A, p)]
                     x_q = x_dict[(q_a, q)]
                     d = d_dict[(p, a, q)]
-                    y_p = y_dict[(p_a, p)]
+                    y_p = y_dict[(p_A, p)]
                     y_q = y_dict[(q_a, q)]
-                    z_p = z_dict[(p_a, p)]
+                    z_p = z_dict[(p_A, p)]
                     z_q = z_dict[(q_a, q)]
                     o = o_dict[(p, a)]
-                    o_A = sigma_A(p_a, a)
+                    o_A = sigma_A(p_A, a)
                     # (3)
                     s.add(Implies(And(x_p, d), x_q))
                     # (4)
@@ -98,8 +98,8 @@ def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition, rep
     # (6)
     for p_A in all_states_here(n_states_A):
         for p in all_states_here(n_states):
-            z_p = z_dict[(p_a, p)]
-            y_p = y_dict[(p_a, p)]
+            z_p = z_dict[(p_A, p)]
+            y_p = y_dict[(p_A, p)]
             s.add(z_p <= y_p)
 
     # (7)
@@ -110,8 +110,8 @@ def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition, rep
     # (8)
     for p_A in all_states_here(n_states_A):
         for p in all_states_here(n_states):
-            y_p = y_dict[(p_a, p)]
-            z_p = z_dict[(p_a, p)]
+            y_p = y_dict[(p_A, p)]
+            z_p = z_dict[(p_A, p)]
             s.add(z_p >= -epsilon, y_p <= epsilon)
     if report:
         print(f"SMT SOLVING ({n_states}/{n_states_A}, epsilon={epsilon})")
@@ -122,10 +122,9 @@ def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition, rep
         model = s.model()
         stransitions = dict()
         for (p, a, q) in d_dict:
-            if p == TERMINAL_STATE or q == TERMINAL_STATE:
-                continue
+            # if p == TERMINAL_STATE or q == TERMINAL_STATE:
+            #     continue
             if is_true(model[d_dict[(p, a, q)]]):
-                # print(f"{o_dict[(p, a)]} /// {model[o_dict[(p, a)]]}")
                 o = model[o_dict[(p, a)]]
                 if o is not None:
                     o = float(o.numerator_as_long())/float(o.denominator_as_long())
@@ -134,15 +133,20 @@ def smt_hyp(epsilon, X, n_states, n_states_A, transitions, empty_transition, rep
                 stransitions[(p, tuple(a))] = [q, o]
 
         global last_displayed_states
-        if n_states != last_displayed_states and report:
+        if n_states != last_displayed_states and report or True:
             last_displayed_states = n_states
             display_transitions(transitions, f"original{n_states}-{n_states_A}")
             display_transitions(stransitions, f"approximation{n_states}-{n_states_A}")
-            print(f"transitions for n_states={n_states}")
-            print("transitions:", transitions)
-            print("stransitions:", stransitions)
         
         # return rm_from_transitions(stransitions, empty_transition)
+        for (key, value) in stransitions.items():
+            if value[1] < -0.5:
+                print("FOUNDFOUNDFOUND")
+                print("FOUNDFOUNDFOUND")
+                print("FOUNDFOUNDFOUND")                
+                import IPython
+                IPython.embed()
+                exit()
         return stransitions
     else:
         return None

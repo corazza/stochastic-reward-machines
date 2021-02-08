@@ -117,6 +117,19 @@ def consistent_hyp(X, n_states_start=2, report=True):
                 x = add_pvar_x((lm, p))
                 o = add_pvar_o((p, l, r))
                 g.add_clause([-x, o])
+        
+        # (Termination)
+        for (labels, rewards) in X:
+            if labels == ():
+                continue
+            lm = labels[0:-1]
+            l = labels[-1]
+            for p in all_states(n_states):
+                x_1 = add_pvar_x((lm, p))
+                d = add_pvar_d((p, l, TERMINAL_STATE))
+                x_2 = add_pvar_x((labels, TERMINAL_STATE))
+                print(f"added ({lm}, {p}) ^ ({p}, {l}, {TERMINAL_STATE}) -> ({labels}, {TERMINAL_STATE})")
+                g.add_clause([-x_1, -d, x_2])
 
         g.solve()
         if g.get_model() is None:
@@ -151,13 +164,13 @@ def consistent_hyp(X, n_states_start=2, report=True):
         # mlip_n_states = n_states - 1 if n_states >= 3 else n_states
         # return mlip_hyp(X, mlip_n_states, n_states, transitions, empty_transition), n_states
 
-        # if n_states >= 3:
-        #     for i in range(2, n_states):
-        #         minimized_rm = smt_hyp(SMT_EPSILON, X, i, n_states, transitions, empty_transition)
-        #         if minimized_rm:
-        #             print(f"FOUND MINIMIZED RM {i} < {n_states} (epsilon={SMT_EPSILON})")
-        #             # exit()
-        #             return minimized_rm, n_states
+        if n_states >= 2:
+            for i in range(2, n_states):
+                minimized_rm = smt_hyp(MINIMIZATION_EPSILON, X, i, n_states, transitions, empty_transition)
+                if minimized_rm:
+                    print(f"FOUND MINIMIZED RM {i} < {n_states} (epsilon={SMT_EPSILON})")
+                    # exit()
+                    return minimized_rm, n_states
             # test_transitions = dict()
             # test_transitions[(1, 'a')] = [2, 0]
             # test_transitions[(2, 'a')] = [3, 0]
@@ -171,7 +184,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
             #     exit()
             #     return minimized_rm, n_states
 
-        # print("couldn't find minimized RM, returning exact")
+        print("couldn't find minimized RM, returning exact")
 
         g.delete()
         return smt_hyp(SMT_EPSILON, X, n_states, n_states, transitions, empty_transition, report), n_states
@@ -353,9 +366,7 @@ def learn(env,
                     H = H_new
                     transitions = transitions_new
                     Q = transfer_Q(H_new, H, Q, X)
-                    # if len(X) > X_PRUNE_MIN_SIZE:
-                    #     X = prune_X(X, transitions, n_states_last)
-                    if n_states_last >= 3:
-                        exit()
+                    if len(X) > X_PRUNE_MIN_SIZE:
+                        X = prune_X(X, transitions, n_states_last)
                 break
             s = sn
