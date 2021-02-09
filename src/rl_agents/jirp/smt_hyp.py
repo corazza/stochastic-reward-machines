@@ -22,9 +22,6 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
         else:
             return 0.0
 
-    def all_states_here(asdf):
-        return all_states_terminal(asdf)
-
     d_dict = dict()
     x_dict = dict()
     o_dict = dict()
@@ -75,8 +72,8 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
             for p_A in all_states_here(n_states_A):
                 for a in language:
                     q_A = delta_A(p_A, a)
-                    # if q_A == TERMINAL_STATE:
-                    #     continue
+                    if q_A == TERMINAL_STATE and not TERMINATION:
+                        continue
                     x_p = x_dict[(p_A, p)]
                     x_q = x_dict[(q_A, q)]
                     d = d_dict[(p, a, q)]
@@ -115,17 +112,18 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
             s.add(z_p >= -epsilon, y_p <= epsilon)
 
     # (Termination)
-    for p in all_states_here(n_states):
-        if p == TERMINAL_STATE:
-            continue
-        for l in language:
-            d = d_dict[(TERMINAL_STATE, l, p)]
-            s.add(Not(d))
+    if TERMINATION:
+        for p in all_states_here(n_states):
+            if p == TERMINAL_STATE:
+                continue
+            for l in language:
+                d = d_dict[(TERMINAL_STATE, l, p)]
+                s.add(Not(d))
 
-    for p in all_states_here(n_states):
-        for l in language:
-            o = o_dict[(TERMINAL_STATE, l)]
-            s.add(o == 0.0)
+        for p in all_states_here(n_states):
+            for l in language:
+                o = o_dict[(TERMINAL_STATE, l)]
+                s.add(o == 0.0)
 
     if report:
         print(f"SMT SOLVING ({n_states}/{n_states_A}, epsilon={epsilon})")
@@ -141,8 +139,8 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
         model = s.model()
         stransitions = dict()
         for (p, a, q) in d_dict:
-            # if p == TERMINAL_STATE or q == TERMINAL_STATE:
-            #     continue
+            if (p == TERMINAL_STATE or q == TERMINAL_STATE) and not TERMINATION:
+                continue
             if is_true(model[d_dict[(p, a, q)]]):
                 o = model[o_dict[(p, a)]]
                 if o is not None:

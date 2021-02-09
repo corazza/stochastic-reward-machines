@@ -59,9 +59,6 @@ def consistent_hyp(X, n_states_start=2, report=True):
             nonlocal prop_x_rev
             return add_pvar(prop_x, prop_x_rev, used_pvars, x)
 
-        def all_states_here(asdf):
-            return all_states_terminal(asdf)
-
         # Encoding reward machines
         # (1)
         for p in all_states_here(n_states):
@@ -121,40 +118,41 @@ def consistent_hyp(X, n_states_start=2, report=True):
                 g.add_clause([-x, o])
         
         # (Termination)
-        for (labels, rewards) in X:
-            if labels == ():
-                continue
-            lm = labels[0:-1]
-            l = labels[-1]
-            x_2 = add_pvar_x((labels, TERMINAL_STATE))
+        if TERMINATION:
+            for (labels, rewards) in X:
+                if labels == ():
+                    continue
+                lm = labels[0:-1]
+                l = labels[-1]
+                x_2 = add_pvar_x((labels, TERMINAL_STATE))
+                for p in all_states_here(n_states):
+                    if p == TERMINAL_STATE:
+                        continue
+                    x_1 = add_pvar_x((lm, p))
+                    d = add_pvar_d((p, l, TERMINAL_STATE))
+                    # g.add_clause([-x_1, d])
+                g.add_clause([x_2])
+
+            # for (labels, rewards) in X:
+            #     lm = labels[0:-1]
+            #     l = labels[-1]
+            #     r = rewards[-1]
+            #     x = add_pvar_x((labels, TERMINAL_STATE))
+            #     for p in all_states_here(n_states):
+            #         o = add_pvar_o((p, l, r))
+            #         g.add_clause([-x, o])
+
             for p in all_states_here(n_states):
                 if p == TERMINAL_STATE:
                     continue
-                x_1 = add_pvar_x((lm, p))
-                d = add_pvar_d((p, l, TERMINAL_STATE))
-                # g.add_clause([-x_1, d])
-            g.add_clause([x_2])
+                for l in language:
+                    d = add_pvar_d((TERMINAL_STATE, l, p))
+                    g.add_clause([-d])
 
-        # for (labels, rewards) in X:
-        #     lm = labels[0:-1]
-        #     l = labels[-1]
-        #     r = rewards[-1]
-        #     x = add_pvar_x((labels, TERMINAL_STATE))
-        #     for p in all_states_here(n_states):
-        #         o = add_pvar_o((p, l, r))
-        #         g.add_clause([-x, o])
-
-        for p in all_states_here(n_states):
-            if p == TERMINAL_STATE:
-                continue
-            for l in language:
-                d = add_pvar_d((TERMINAL_STATE, l, p))
-                g.add_clause([-d])
-
-        for p in all_states_here(n_states):
-            for l in language:
-                o = add_pvar_o((TERMINAL_STATE, l, 0.0))
-                g.add_clause([o])
+            for p in all_states_here(n_states):
+                for l in language:
+                    o = add_pvar_o((TERMINAL_STATE, l, 0.0))
+                    g.add_clause([o])
 
         g.solve()
         if g.get_model() is None:
@@ -367,7 +365,7 @@ def learn(env,
                 else:    _delta = h_r + gamma*get_qmax(Q[v_next], sn, actions, q_init) - Q[v][s][a]
                 Q[v][s][a] += lr*_delta
 
-            if not rm_done:
+            if not rm_done or not TERMINATION:
                 rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
 
             # import IPython

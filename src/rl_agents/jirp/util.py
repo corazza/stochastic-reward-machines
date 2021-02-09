@@ -216,3 +216,9 @@ def isomorphic(t1, t2, n_states):
         if t2_bij == t1:
             return True
     return False
+
+def all_states_here(asdf):
+    if TERMINATION:
+        return all_states_terminal(asdf)
+    else:
+        return all_states(asdf)
