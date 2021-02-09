@@ -118,7 +118,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
             for p in all_states_here(n_states):
                 x = add_pvar_x((lm, p))
                 o = add_pvar_o((p, l, r))
-                # g.add_clause([-x, o])
+                g.add_clause([-x, o])
         
         # (Termination)
         for (labels, rewards) in X:
@@ -133,7 +133,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
                 x_1 = add_pvar_x((lm, p))
                 d = add_pvar_d((p, l, TERMINAL_STATE))
                 # g.add_clause([-x_1, d])
-            
+            g.add_clause([x_2])
 
         # for (labels, rewards) in X:
         #     lm = labels[0:-1]
