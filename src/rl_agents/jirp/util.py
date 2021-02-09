@@ -21,6 +21,9 @@ def rm_run(labels, H):
             break
     return rewards
 
+def run_eqv(output1, output2):
+    return output1 == output2
+
 def run_approx_eqv(output1, output2):
     """
     Returns True if outputs are approximately equivalent
@@ -82,10 +85,11 @@ def dnf_for_empty(language):
             L.add("!" + str(label))
     return "&".join(L)
 
-def prefixes(X):
+def prefixes(X, without_terminal=False):
     yield ((), ()) # (\epsilon, \epsilon) \in Pref(X)
     for (labels, rewards) in X:
-        for i in range(1, len(labels)+1):
+        ending = 1 if not without_terminal else 0
+        for i in range(1, len(labels) + ending):
             yield (labels[0:i], rewards[0:i])
 
 def all_pairs(xs):

@@ -152,7 +152,7 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
                 stransitions[(p, tuple(a))] = [q, o]
 
         global last_displayed_states
-        if n_states != last_displayed_states and report:
+        if n_states != last_displayed_states and report or True:
             last_displayed_states = n_states
             display_transitions(transitions, f"original{n_states}-{n_states_A}")
             display_transitions(stransitions, f"approximation{n_states}-{n_states_A}")

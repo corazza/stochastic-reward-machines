@@ -96,7 +96,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
             g.add_clause([-add_pvar_x((tuple(), p))])
 
         # (4)
-        for (labels, _rewards) in prefixes(X):
+        for (labels, _rewards) in prefixes(X, without_terminal=False):
             if labels == ():
                 continue
             lm = labels[0:-1]
@@ -109,7 +109,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
                     g.add_clause([-x_1, -d, x_2])
 
         # (5)
-        for (labels, rewards) in prefixes(X):
+        for (labels, rewards) in prefixes(X, without_terminal=False):
             if labels == ():
                 continue
             lm = labels[0:-1]
@@ -118,13 +118,32 @@ def consistent_hyp(X, n_states_start=2, report=True):
             for p in all_states_here(n_states):
                 x = add_pvar_x((lm, p))
                 o = add_pvar_o((p, l, r))
-                g.add_clause([-x, o])
+                # g.add_clause([-x, o])
         
         # (Termination)
         for (labels, rewards) in X:
-            x = add_pvar_x((labels, TERMINAL_STATE))
-            g.add_clause([x])
-        
+            if labels == ():
+                continue
+            lm = labels[0:-1]
+            l = labels[-1]
+            x_2 = add_pvar_x((labels, TERMINAL_STATE))
+            for p in all_states_here(n_states):
+                if p == TERMINAL_STATE:
+                    continue
+                x_1 = add_pvar_x((lm, p))
+                d = add_pvar_d((p, l, TERMINAL_STATE))
+                # g.add_clause([-x_1, d])
+            
+
+        # for (labels, rewards) in X:
+        #     lm = labels[0:-1]
+        #     l = labels[-1]
+        #     r = rewards[-1]
+        #     x = add_pvar_x((labels, TERMINAL_STATE))
+        #     for p in all_states_here(n_states):
+        #         o = add_pvar_o((p, l, r))
+        #         g.add_clause([-x, o])
+
         for p in all_states_here(n_states):
             if p == TERMINAL_STATE:
                 continue
@@ -218,7 +237,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         output1 = rm_run(labels, H1)
         output2 = rm_run(labels, H2)
-        if run_sum_approx_eqv(output1, output2):
+        if run_eqv(output1, output2):
             eqv += 1
         # if rm_run(labels, H1) == rm_run(labels, H2):
         #     eqv += 1
@@ -324,7 +343,7 @@ def learn(env,
 
             if random.random() <= NOISE_PROB and r == 1:
                 direction = 1.0 if random.random() <= 0.5 else 1.0
-                r += NOISE * direction
+                # r += NOISE * direction
 
             sn = tuple(sn)
             true_props = env.get_events()
@@ -351,6 +370,9 @@ def learn(env,
             if not rm_done:
                 rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
 
+            # import IPython
+            # IPython.embed()
+
             # moving to the next state
             reward_total += r
             rewards.append(r)
@@ -370,7 +392,7 @@ def learn(env,
                 num_episodes += 1
                 total_episodes += 1
                 # if rm_run(labels, H) != rewards:
-                if not run_sum_approx_eqv(rm_run(labels, H), rewards):
+                if not run_eqv(rm_run(labels, H), rewards):
                     X_new.add((tuple(labels), tuple(rewards)))
 
                 if num_episodes % UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
