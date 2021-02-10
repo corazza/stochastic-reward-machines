@@ -6,7 +6,7 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-def mlip_hyp(language, n_states, n_states_A, transitions, empty_transition):
+def mip_hyp(_epsilon, language, n_states, n_states_A, transitions, empty_transition, report=True, inspect=False, display=False):
     def delta_A(p_a, a):
         a = tuple(a)
         if (p_a, a) in transitions:
@@ -20,18 +20,15 @@ def mlip_hyp(language, n_states, n_states_A, transitions, empty_transition):
         else:
             return 0.0
 
-    def all_states_here(asdf):
-        return all_states(asdf)
-
     reward_bound = 1000.0
     epsilon_bound = 1000.0
     interval_bound = 10000.0
 
     m = Model()
-    # m.verbose = 0
-    # m.emphasis = 1
+    m.verbose = 0
+    m.emphasis = 1
     m.threads = -1
-    m.pump_passes = 300
+    # m.pump_passes = 300
 
     epsilon = m.add_var(var_type=CONTINUOUS, ub=epsilon_bound)
     m.objective = minimize(epsilon)
@@ -84,7 +81,7 @@ def mlip_hyp(language, n_states, n_states_A, transitions, empty_transition):
             for p_a in all_states_here(n_states_A):
                 for a in language:
                     q_a = delta_A(p_a, a)
-                    if q_a == TERMINAL_STATE:
+                    if q_a == TERMINAL_STATE and not TERMINATION:
                         continue
                     x_p = x_dict[(p_a, p)]
                     x_q = x_dict[(q_a, q)]
@@ -118,14 +115,31 @@ def mlip_hyp(language, n_states, n_states_A, transitions, empty_transition):
             # (xii)
             m += -epsilon <= z_dict[(p_a, p)]
 
-    print(f"Starting MLIP solving, n_states={n_states}, n_states_A={n_states_A}")
+    if TERMINATION:
+        for p in all_states_here(n_states):
+            if p == TERMINAL_STATE:
+                continue
+            for l in language:
+                d = d_dict[(TERMINAL_STATE, l, p)]
+                m += d == 0
+
+        for p in all_states_here(n_states):
+            for l in language:
+                o = o_dict[(TERMINAL_STATE, l)]
+                m += o == 0.0
+
+
+    if report:
+        print(f"Starting MLIP solving, n_states={n_states}, n_states_A={n_states_A}")
     m.optimize()
-    print(f"Done, epsilon={epsilon.x}")
+    if report:
+        print(f"Done, epsilon={epsilon.x}")
 
     if epsilon.x > 0:
         m.preprocess = 0
         m.optimize()
-        print(f"Done new, epsilon={epsilon.x}")
+        if report:
+            print(f"Done new, epsilon={epsilon.x}")
 
     mtransitions = dict()
     for (p, a, q) in d_dict:
@@ -135,9 +149,8 @@ def mlip_hyp(language, n_states, n_states_A, transitions, empty_transition):
             o = o_dict[(p, a)].x
             mtransitions[(p, tuple(a))] = [q, o]
 
-    display_transitions(transitions, f"original{n_states}-{n_states_A}")
-    display_transitions(mtransitions, f"approximation{n_states}-{n_states_A}")
-    # print(f"transitions for n_states={n_states}")
-    # print("transitions:", transitions)
-    # print("mtransitions:", mtransitions)
-    return rm_from_transitions(mtransitions, empty_transition)
+    if display:
+        display_transitions(transitions, f"mip_original{n_states}-{n_states_A}")
+        display_transitions(mtransitions, f"mip_approximation{n_states}-{n_states_A}")
+
+    return mtransitions

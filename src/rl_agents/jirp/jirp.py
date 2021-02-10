@@ -13,9 +13,11 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 from rl_agents.jirp.util import *
 from rl_agents.jirp.consts import *
-from rl_agents.jirp.mip_hyp import mlip_hyp
+from rl_agents.jirp.mip_hyp import mip_hyp
 from rl_agents.jirp.smt_hyp import smt_hyp
 
+
+last_displayed_states = 0
 
 # @profile
 def consistent_hyp(X, n_states_start=2, report=True):
@@ -184,39 +186,47 @@ def consistent_hyp(X, n_states_start=2, report=True):
             else:
                 raise ValueError("Uknown p-var dict")
 
+        approximation_method = mip_hyp
+
         # mlip_n_states = n_states - 1 if n_states >= 3 else n_states
         # return mlip_hyp(X, mlip_n_states, n_states, transitions, empty_transition), n_states
 
         if n_states >= 2:
             for i in range(2, n_states):
-                minimized_rm = smt_hyp(MINIMIZATION_EPSILON, language, i, n_states, transitions, empty_transition, report=True)
+                minimized_rm = approximation_method(MINIMIZATION_EPSILON, language, i, n_states, transitions, empty_transition, report=True)
                 if minimized_rm:
                     print(f"FOUND MINIMIZED RM {i} < {n_states} (epsilon={SMT_EPSILON})")
                     display_transitions(transitions, f"original-{i}-{n_states}")
                     display_transitions(minimized_rm, f"approximation-{i}-{n_states}")
                     print(transitions)
                     print(minimized_rm)
-                    exit()
+                    # exit()
                     return minimized_rm, n_states
 
-            test_transitions = dict()
-            test_transitions[(1, ('a',))] = [2, 0]
-            test_transitions[(1, ('b',))] = [3, 0]
-            test_transitions[(2, ('a',))] = [4, 0]
-            test_transitions[(3, ('a',))] = [5, 0]
-            test_transitions[(4, ('a',))] = [-1, 1.1]
-            test_transitions[(5, ('a',))] = [-1, 0.9]
-            minimized_rm = smt_hyp(MINIMIZATION_EPSILON, {"a", "b"}, 3, 5, test_transitions, empty_transition, inspect=True)
-            if minimized_rm:
-                print(f"FOUND MINIMIZED RM")
-                print(minimized_rm)
-                return minimized_rm, n_states
-            exit()
+            # test_transitions = dict()
+            # test_transitions[(1, ('a',))] = [2, 0]
+            # test_transitions[(1, ('b',))] = [3, 0]
+            # test_transitions[(2, ('a',))] = [4, 0]
+            # test_transitions[(3, ('a',))] = [5, 0]
+            # test_transitions[(4, ('a',))] = [-1, 1.1]
+            # test_transitions[(5, ('a',))] = [-1, 0.9]
+            # minimized_rm = approximation_method(MINIMIZATION_EPSILON, {"a", "b"}, 3, 5, test_transitions, empty_transition, inspect=True)
+            # if minimized_rm:
+            #     print(f"FOUND MINIMIZED RM")
+            #     print(minimized_rm)
+            #     return minimized_rm, n_states
+            # exit()
 
         print("couldn't find minimized RM, returning exact")
 
         g.delete()
-        return smt_hyp(SMT_EPSILON, language, n_states, n_states, transitions, empty_transition, report), n_states
+
+        display = False
+        global last_displayed_states
+        if n_states > last_displayed_states or n_states <= 2:
+            display = True
+            last_displayed_states = n_states
+        return approximation_method(SMT_EPSILON, language, n_states, n_states, transitions, empty_transition, report, display=display), n_states
         # display_transitions(transitions, f"test{n_states}")
 
         # return transitions, n_states

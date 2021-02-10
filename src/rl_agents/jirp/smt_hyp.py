@@ -6,9 +6,7 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-last_displayed_states = 0
-
-def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transition, report=True, inspect=False):
+def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transition, report=True, inspect=False, display=False):
     def delta_A(p_A, a):
         a = tuple(a)
         if (p_A, a) in transitions:
@@ -149,9 +147,7 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
                     o = 0 # solver doesn't care (?)
                 stransitions[(p, tuple(a))] = [q, o]
 
-        global last_displayed_states
-        if n_states != last_displayed_states and report or True:
-            last_displayed_states = n_states
+        if display:
             display_transitions(transitions, f"original{n_states}-{n_states_A}")
             display_transitions(stransitions, f"approximation{n_states}-{n_states_A}")
         
