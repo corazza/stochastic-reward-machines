@@ -6,7 +6,7 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
+def mlip_hyp(language, n_states, n_states_A, transitions, empty_transition):
     def delta_A(p_a, a):
         a = tuple(a)
         if (p_a, a) in transitions:
@@ -22,8 +22,6 @@ def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
 
     def all_states_here(asdf):
         return all_states(asdf)
-
-    language = sample_language(X)
 
     reward_bound = 1000.0
     epsilon_bound = 1000.0
@@ -58,12 +56,6 @@ def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
         for q in all_states_here(n_states):
             for a in language:
                 d_dict[(p, a, q)] = m.add_var(var_type=BINARY)
-
-    # TODO remove
-    # for q in all_states(n_states):
-    #     x_dict[(TERMINAL_STATE, q)] = m.add_var(var_type=BINARY)
-    #     y_dict[(TERMINAL_STATE, q)] = m.add_var(lb=-math.inf)
-    #     z_dict[(TERMINAL_STATE, q)] = m.add_var(lb=-math.inf)
 
     # (i)
     m += epsilon >= 0
@@ -137,7 +129,7 @@ def mlip_hyp(X, n_states, n_states_A, transitions, empty_transition):
 
     mtransitions = dict()
     for (p, a, q) in d_dict:
-        if p == TERMINAL_STATE or q == TERMINAL_STATE or d_dict[(p, a, q)].x is None:
+        if ((p == TERMINAL_STATE or q == TERMINAL_STATE) and not TERMINATION) or d_dict[(p, a, q)].x is None:
             continue
         if d_dict[(p, a, q)].x > 0:
             o = o_dict[(p, a)].x

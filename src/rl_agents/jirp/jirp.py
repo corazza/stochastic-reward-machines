@@ -130,8 +130,8 @@ def consistent_hyp(X, n_states_start=2, report=True):
                         continue
                     x_1 = add_pvar_x((lm, p))
                     d = add_pvar_d((p, l, TERMINAL_STATE))
-                    # g.add_clause([-x_1, d])
-                g.add_clause([x_2])
+                    g.add_clause([-x_1, d])
+                # g.add_clause([x_2])
 
             # for (labels, rewards) in X:
             #     lm = labels[0:-1]
@@ -199,19 +199,19 @@ def consistent_hyp(X, n_states_start=2, report=True):
                     exit()
                     return minimized_rm, n_states
 
-            # test_transitions = dict()
-            # test_transitions[(1, ('a',))] = [2, 0]
-            # test_transitions[(1, ('b',))] = [3, 0]
-            # test_transitions[(2, ('a',))] = [4, 0]
-            # test_transitions[(3, ('a',))] = [5, 0]
-            # test_transitions[(4, ('a',))] = [-1, 1.1]
-            # test_transitions[(5, ('a',))] = [-1, 0.9]
-            # minimized_rm = smt_hyp(MINIMIZATION_EPSILON, {"a", "b"}, 3, 5, test_transitions, empty_transition, inspect=True)
-            # if minimized_rm:
-            #     print(f"FOUND MINIMIZED RM")
-            #     print(minimized_rm)
-            #     return minimized_rm, n_states
-            # exit()
+            test_transitions = dict()
+            test_transitions[(1, ('a',))] = [2, 0]
+            test_transitions[(1, ('b',))] = [3, 0]
+            test_transitions[(2, ('a',))] = [4, 0]
+            test_transitions[(3, ('a',))] = [5, 0]
+            test_transitions[(4, ('a',))] = [-1, 1.1]
+            test_transitions[(5, ('a',))] = [-1, 0.9]
+            minimized_rm = smt_hyp(MINIMIZATION_EPSILON, {"a", "b"}, 3, 5, test_transitions, empty_transition, inspect=True)
+            if minimized_rm:
+                print(f"FOUND MINIMIZED RM")
+                print(minimized_rm)
+                return minimized_rm, n_states
+            exit()
 
         print("couldn't find minimized RM, returning exact")
 
@@ -291,7 +291,17 @@ def prune_X(X, transitions, n_states):
                 break
         if len(X_result) <= X_PRUNE_MIN_SIZE:
             break
+
+    # X_result = set()
+    # first = True
+    # for (labels, rewards) in X:
+    #     labels_set = set(labels)
+    #     if labels_set != set(('', 'b')) or first:
+    #         X_result.add((labels, rewards))
+    #         first = False
+
     print(f"new size is {len(X_result)}")
+
     return X_result
 
 def learn(env,
@@ -368,8 +378,9 @@ def learn(env,
             if not rm_done or not TERMINATION:
                 rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
 
-            # import IPython
-            # IPython.embed()
+            # if n_states_last == 3:
+            #     import IPython
+            #     IPython.embed()
 
             # moving to the next state
             reward_total += r
