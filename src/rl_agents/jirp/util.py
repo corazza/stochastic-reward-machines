@@ -31,7 +31,7 @@ def run_approx_eqv(output1, output2):
     if len(output1) != len(output2):
         return False
     for i in range(0, len(output1)):
-        if abs(output1[i] - output2[i]) > SMT_EPSILON:
+        if abs(output1[i] - output2[i]) > 3*EXACT_EPSILON:
             return False
     return True
 
@@ -41,9 +41,7 @@ def run_sum_approx_eqv(output1, output2):
     """
     sum1 = sum(output1)
     sum2 = sum(output2)
-    # if abs(sum1 - sum2) > SMT_EPSILON:
-    #     print(sum1, sum2)
-    return abs(sum1 - sum2) <= SMT_EPSILON
+    return abs(sum1 - sum2) <= 3*EXACT_EPSILON
 
 
 def sample_language(X):
@@ -222,3 +220,7 @@ def all_states_here(asdf):
         return all_states_terminal(asdf)
     else:
         return all_states(asdf)
+
+def write_to_asdf(s):
+    with open("asdf.txt", "w") as asdf:
+        asdf.write(s)

@@ -131,7 +131,6 @@ class RewardMachineHidden(gym.Wrapper):
 
     def step(self, action):
         next_obs, rm_rew, done, info = self.env.step(action)
-        info["true_props"] = self.env.get_events()
         return self.hidden_obs(next_obs), rm_rew, done, info
 
     def _set_constant_rm(self):

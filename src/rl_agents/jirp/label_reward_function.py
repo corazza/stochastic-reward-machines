@@ -14,11 +14,13 @@ class LabelRewardFunction(RewardFunction):
         return "label"
 
     def get_reward(self, s_info):
+        if "true_props" not in s_info:
+            return 0.0
         true_props = s_info["true_props"]
         for dnf in self.label_rewards:
             if evaluate_dnf_compiled(self.compiled_dnfs[dnf], true_props):
                 return self.label_rewards[dnf]
-        return 0
+        return 0.0
 
     def __str__(self):
         return str(self.label_rewards)

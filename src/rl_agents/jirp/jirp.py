@@ -5,6 +5,7 @@ import math
 import itertools
 import random, time, copy
 from profilehooks import profile
+import IPython
 
 from pysat.solvers import Glucose4
 from baselines import logger
@@ -20,7 +21,7 @@ from rl_agents.jirp.smt_hyp import smt_hyp
 last_displayed_states = 0
 
 # @profile
-def consistent_hyp(X, n_states_start=2, report=True):
+def consistent_hyp(X, X_tl, n_states_start=2, report=True):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
     and its number of states
@@ -121,19 +122,32 @@ def consistent_hyp(X, n_states_start=2, report=True):
         
         # (Termination)
         if TERMINATION:
-            for (labels, rewards) in X:
+            for (labels, _rewards) in prefixes(X, without_terminal=True):
                 if labels == ():
                     continue
                 lm = labels[0:-1]
                 l = labels[-1]
-                x_2 = add_pvar_x((labels, TERMINAL_STATE))
+                x_2 = add_pvar_x((labels, TERMINAL_STATE)) # TODO REMOVE unneeded
                 for p in all_states_here(n_states):
                     if p == TERMINAL_STATE:
                         continue
                     x_1 = add_pvar_x((lm, p))
                     d = add_pvar_d((p, l, TERMINAL_STATE))
-                    g.add_clause([-x_1, d])
-                # g.add_clause([x_2])
+                    g.add_clause([-x_1, -d])
+
+            for (labels, rewards) in X:
+                if labels == ():
+                    continue
+                lm = labels[0:-1]
+                l = labels[-1]
+                x_2 = add_pvar_x((labels, TERMINAL_STATE)) # TODO REMOVE unneeded
+                for p in all_states_here(n_states):
+                    if p == TERMINAL_STATE:
+                        continue
+                    x_1 = add_pvar_x((lm, p))
+                    d = add_pvar_d((p, l, TERMINAL_STATE))
+                    d_t = -d if (labels, rewards) in X_tl else d
+                    g.add_clause([-x_1, d_t])
 
             # for (labels, rewards) in X:
             #     lm = labels[0:-1]
@@ -186,37 +200,19 @@ def consistent_hyp(X, n_states_start=2, report=True):
             else:
                 raise ValueError("Uknown p-var dict")
 
-        approximation_method = mip_hyp
-
-        # mlip_n_states = n_states - 1 if n_states >= 3 else n_states
-        # return mlip_hyp(X, mlip_n_states, n_states, transitions, empty_transition), n_states
+        approximation_method = smt_hyp
 
         if n_states >= 2:
             for i in range(2, n_states):
                 minimized_rm = approximation_method(MINIMIZATION_EPSILON, language, i, n_states, transitions, empty_transition, report=True)
                 if minimized_rm:
-                    print(f"FOUND MINIMIZED RM {i} < {n_states} (epsilon={SMT_EPSILON})")
+                    print(f"FOUND MINIMIZED RM {i} < {n_states}")
                     display_transitions(transitions, f"original-{i}-{n_states}")
                     display_transitions(minimized_rm, f"approximation-{i}-{n_states}")
                     print(transitions)
                     print(minimized_rm)
-                    # exit()
+                    exit()
                     return minimized_rm, n_states
-
-            # test_transitions = dict()
-            # test_transitions[(1, ('a',))] = [2, 0]
-            # test_transitions[(1, ('b',))] = [3, 0]
-            # test_transitions[(2, ('a',))] = [4, 0]
-            # test_transitions[(3, ('a',))] = [5, 0]
-            # test_transitions[(4, ('a',))] = [-1, 1.1]
-            # test_transitions[(5, ('a',))] = [-1, 0.9]
-            # minimized_rm = approximation_method(MINIMIZATION_EPSILON, {"a", "b"}, 3, 5, test_transitions, empty_transition, inspect=True)
-            # if minimized_rm:
-            #     print(f"FOUND MINIMIZED RM")
-            #     print(minimized_rm)
-            #     return minimized_rm, n_states
-            # exit()
-
         print("couldn't find minimized RM, returning exact")
 
         g.delete()
@@ -226,7 +222,7 @@ def consistent_hyp(X, n_states_start=2, report=True):
         if n_states > last_displayed_states or n_states <= 2:
             display = True
             last_displayed_states = n_states
-        return approximation_method(SMT_EPSILON, language, n_states, n_states, transitions, empty_transition, report, display=display), n_states
+        return approximation_method(EXACT_EPSILON, language, n_states, n_states, transitions, empty_transition, report, display=True), n_states
         # display_transitions(transitions, f"test{n_states}")
 
         # return transitions, n_states
@@ -245,7 +241,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         output1 = rm_run(labels, H1)
         output2 = rm_run(labels, H2)
-        if run_eqv(output1, output2):
+        if run_sum_approx_eqv(output1, output2):
             eqv += 1
         # if rm_run(labels, H1) == rm_run(labels, H2):
         #     eqv += 1
@@ -334,10 +330,11 @@ def learn(env,
 
     X = set()
     X_new = set()
+    X_tl = set()
     labels = []
     rewards = []
 
-    transitions, n_states_last = consistent_hyp(set())
+    transitions, n_states_last = consistent_hyp(set(), set())
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     H = rm_from_transitions(transitions, empty_transition)
@@ -345,18 +342,31 @@ def learn(env,
     actions = list(range(env.action_space.n))
     Q = initial_Q(H)
 
+    # test_transitions = dict()
+    # test_transitions[(1, ('a',))] = [2, 0]
+    # test_transitions[(1, ('b',))] = [3, 0]
+    # test_transitions[(2, ('a',))] = [4, 0]
+    # test_transitions[(3, ('a',))] = [5, 0]
+    # test_transitions[(4, ('a',))] = [-1, 1.1]
+    # test_transitions[(5, ('a',))] = [-1, 0.9]
+    # minimized_rm = mip_hyp(MINIMIZATION_EPSILON, {"a", "b"}, 3, 5, test_transitions, empty_transition, inspect=True, display=True, report=True)
+    # exit()
+
+    counter = 0
+
     while step < total_timesteps:
         s = tuple(env.reset())
         true_props = env.get_events()
         rm_state = H.reset()
         labels = []
         rewards = []
+        next_random = False
 
         if s not in Q[rm_state]: Q[rm_state][s] = dict([(a, q_init) for a in actions])
 
         while True:
             # Selecting and executing the action
-            a = random.choice(actions) if random.random() < epsilon else get_best_action(Q[rm_state],s,actions,q_init)
+            a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
             sn, r, done, info = env.step(a)
 
             if random.random() <= NOISE_PROB and r == 1:
@@ -387,10 +397,11 @@ def learn(env,
 
             if not rm_done or not TERMINATION:
                 rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
+            else:
+                next_random = True
 
-            # if n_states_last == 3:
-            #     import IPython
-            #     IPython.embed()
+            if step >= 1e5:
+                IPython.embed()
 
             # moving to the next state
             reward_total += r
@@ -411,17 +422,28 @@ def learn(env,
                 num_episodes += 1
                 total_episodes += 1
                 # if rm_run(labels, H) != rewards:
-                if not run_eqv(rm_run(labels, H), rewards):
+                if not run_sum_approx_eqv(rm_run(labels, H), rewards):
                     X_new.add((tuple(labels), tuple(rewards)))
+                    # if env.current_u_id != TERMINAL_STATE:
+                    #     X_tl.add((tuple(labels), tuple(rewards)))
+                    #     IPython.embed()
+                    if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
+                        # IPython.embed()
+                        tl = info["TimeLimit.truncated"]
+                        if tl:
+                            X_tl.add((tuple(labels), tuple(rewards)))
 
                 if num_episodes % UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
+                    # if counter == 10:
+                    #     IPython.embed()
+                    counter += 1
                     X.update(X_new)
                     X_new = set()
                     language = sample_language(X)
                     empty_transition = dnf_for_empty(language)
-                    transitions_new, n_states_last = consistent_hyp(X, n_states_last)
+                    transitions_new, n_states_last = consistent_hyp(X, X_tl, n_states_last)
                     # if n_states_last >= 3:
                     #     exit()
                     H_new = rm_from_transitions(transitions_new, empty_transition)

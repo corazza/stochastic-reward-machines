@@ -26,7 +26,7 @@ def mip_hyp(_epsilon, language, n_states, n_states_A, transitions, empty_transit
 
     m = Model()
     m.verbose = 0
-    m.emphasis = 1
+    # m.emphasis = 1
     m.threads = -1
     # m.pump_passes = 300
 
@@ -53,6 +53,8 @@ def mip_hyp(_epsilon, language, n_states, n_states_A, transitions, empty_transit
         for q in all_states_here(n_states):
             for a in language:
                 d_dict[(p, a, q)] = m.add_var(var_type=BINARY)
+
+    m += epsilon <= MINIMIZATION_EPSILON * 2.0
 
     # (i)
     m += epsilon >= 0
@@ -130,16 +132,19 @@ def mip_hyp(_epsilon, language, n_states, n_states_A, transitions, empty_transit
 
 
     if report:
-        print(f"Starting MLIP solving, n_states={n_states}, n_states_A={n_states_A}")
+        print(f"Starting MIP solving, n_states={n_states}, n_states_A={n_states_A}")
     m.optimize()
     if report:
         print(f"Done, epsilon={epsilon.x}")
 
-    if epsilon.x > 0:
-        m.preprocess = 0
-        m.optimize()
-        if report:
-            print(f"Done new, epsilon={epsilon.x}")
+    if epsilon.x == None:
+        return None
+
+    # if epsilon.x > 0:
+    #     m.preprocess = 0
+    #     m.optimize()
+    #     if report:
+    #         print(f"Done new, epsilon={epsilon.x}")
 
     mtransitions = dict()
     for (p, a, q) in d_dict:

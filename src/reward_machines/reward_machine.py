@@ -58,6 +58,11 @@ class RewardMachine:
         assert u1 != self.terminal_u, "the RM was set to a terminal state!"
         u2 = self.get_next_state(u1, true_props)
         done = (u2 == self.terminal_u)
+
+        ###
+        s_info["true_props"] = true_props
+        ###
+
         # Getting the reward
         rew = self._get_reward(u1,u2,s_info,add_rs, env_done)
         
