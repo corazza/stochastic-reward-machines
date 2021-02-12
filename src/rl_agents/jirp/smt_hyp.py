@@ -148,16 +148,9 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
                 stransitions[(p, tuple(a))] = [q, o]
 
         if display:
-            display_transitions(transitions, f"original{n_states}-{n_states_A}")
-            display_transitions(stransitions, f"approximation{n_states}-{n_states_A}")
+            display_transitions(transitions, f"smt_original{n_states}-{n_states_A}")
+            display_transitions(stransitions, f"smt_approximation{n_states}-{n_states_A}")
         
-        # return rm_from_transitions(stransitions, empty_transition)
-        for (key, value) in stransitions.items():
-            if value[1] < -0.5:
-                print("FOUNDFOUNDFOUND")
-                print("FOUNDFOUNDFOUND")
-                print("FOUNDFOUNDFOUND")
-
         if inspect:
             display_transitions(transitions, "given")
             display_transitions(stransitions, "smt")

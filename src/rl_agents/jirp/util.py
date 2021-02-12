@@ -3,6 +3,7 @@ import itertools
 import os, tempfile
 from collections import defaultdict
 from graphviz import Digraph
+import IPython
 
 from reward_machines.reward_machine import RewardMachine
 
@@ -17,7 +18,7 @@ def rm_run(labels, H):
     for props in labels:
         current_state, reward, done = H.step(current_state, props, {"true_props": props})
         rewards.append(reward)
-        if done: 
+        if done:
             break
     return rewards
 
@@ -39,6 +40,8 @@ def run_sum_approx_eqv(output1, output2):
     """
     Returns True if output sums are approximately equivalent
     """
+    if len(output1) != len(output2):
+        return False
     sum1 = sum(output1)
     sum2 = sum(output2)
     return abs(sum1 - sum2) <= 3*EXACT_EPSILON
@@ -224,3 +227,15 @@ def all_states_here(asdf):
 def write_to_asdf(s):
     with open("asdf.txt", "w") as asdf:
         asdf.write(s)
+
+def rm_to_transitions(rm):
+    transitions = dict()
+    for (u1, tr) in rm.delta_u.items():
+        for (dnf, u2) in tr.items():
+            transitions[(u1, dnf)] = [u2, 0.0]
+    return transitions
+
+def powerset(iterable):
+    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    s = list(iterable)
+    return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s)+1))
