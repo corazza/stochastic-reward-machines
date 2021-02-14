@@ -6,8 +6,6 @@ import itertools
 import random, time, copy
 from profilehooks import profile
 import IPython
-
-from pysat.solvers import Glucose4
 from baselines import logger
 
 from reward_machines.reward_machine import RewardMachine
@@ -15,13 +13,16 @@ from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 from rl_agents.jirp.util import *
 from rl_agents.jirp.consts import *
 from rl_agents.jirp.test import *
-from rl_agents.jirp.mip_hyp import mip_hyp
+from rl_agents.jirp.mip_approx import mip_approx
+from rl_agents.jirp.smt_approx import smt_approx
 from rl_agents.jirp.smt_hyp import smt_hyp
+from rl_agents.jirp.mip_hyp import mip_hyp
+from rl_agents.jirp.sat_hyp import sat_hyp
 
 
 last_displayed_states = 0
 
-# @profile
+# @profile(sort="tottime")
 def consistent_hyp(X, X_tl, n_states_start=2, report=True):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
@@ -30,196 +31,20 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
     n_states_start makes the search start from machines with that number of states.
     Used to optimize succeeding search calls.
     """
-    language = sample_language(X)
-    empty_transition = dnf_for_empty(language)
-    reward_alphabet = sample_reward_alphabet(X)
-
+    if len(X) == 0:
+        transitions = dict()
+        transitions[(1, tuple())] = [1, 0.0]
+        transitions[(2, tuple())] = [1, 0.0]
+        return transitions, 2
+    # TODO intercept empty X here
     for n_states in range(n_states_start, MAX_RM_STATES_N+1):
         if report:
             print(f"finding model with {n_states} states")
-
-        prop_d = dict() # maps SAT's propvar (int) to (p: state, l: labels, q: state)
-        prop_d_rev = dict()
-        prop_o = dict() # maps SAT's propvar (int) to (p: state, l: labels, r: reward)
-        prop_o_rev = dict()
-        prop_x = dict() # maps SAT's propvar (int) to (l: labels, q: state)
-        prop_x_rev = dict()
-        used_pvars = [0] # p. var. counter
-        g = Glucose4() # solver
-
-        # convenience methods
-        def add_pvar_d(d):
-            nonlocal prop_d
-            nonlocal prop_d_rev
-            return add_pvar(prop_d, prop_d_rev, used_pvars, d)
-
-        def add_pvar_o(o):
-            nonlocal prop_o
-            nonlocal prop_o_rev
-            return add_pvar(prop_o, prop_o_rev, used_pvars, o)
-
-        def add_pvar_x(x):
-            nonlocal prop_x
-            nonlocal prop_x_rev
-            return add_pvar(prop_x, prop_x_rev, used_pvars, x)
-
-        # Encoding reward machines
-        # (1)
-        for p in all_states_here(n_states):
-            for l in language:
-                g.add_clause([add_pvar_d((p, l, q)) for q in all_states_here(n_states)])
-                for q1 in all_states_here(n_states):
-                    for q2 in all_states_here(n_states):
-                        if q1==q2:
-                            continue
-                        p_l_q1 = add_pvar_d((p, l, q1))
-                        p_l_q2 = add_pvar_d((p, l, q2))
-                        g.add_clause([-p_l_q1, -p_l_q2])
-
-        # (2)
-        for p in all_states_here(n_states):
-            for l in language:
-                g.add_clause([add_pvar_o((p, l, r)) for r in reward_alphabet])
-                for r1 in reward_alphabet:
-                    for r2 in reward_alphabet:
-                        if r1 == r2:
-                            continue
-                        p_l_r1 = add_pvar_o((p, l, r1))
-                        p_l_r2 = add_pvar_o((p, l, r2))
-                        g.add_clause([-p_l_r1, -p_l_r2])
-
-        # Consistency with sample
-        # (3)
-        g.add_clause([add_pvar_x((tuple(), INITIAL_STATE))]) # starts in the initial state
-        for p in all_states_here(n_states):
-            if p == INITIAL_STATE:
-                continue
-            g.add_clause([-add_pvar_x((tuple(), p))])
-
-        # (4)
-        for (labels, _rewards) in prefixes(X, without_terminal=False):
-            if labels == ():
-                continue
-            lm = labels[0:-1]
-            l = labels[-1]
-            for p in all_states_here(n_states):
-                for q in all_states_here(n_states):
-                    x_1 = add_pvar_x((lm, p))
-                    d = add_pvar_d((p, l, q))
-                    x_2 = add_pvar_x((labels, q))
-                    g.add_clause([-x_1, -d, x_2])
-
-        # (5)
-        for (labels, rewards) in prefixes(X, without_terminal=False):
-            if labels == ():
-                continue
-            lm = labels[0:-1]
-            l = labels[-1]
-            r = rewards[-1]
-            for p in all_states_here(n_states):
-                x = add_pvar_x((lm, p))
-                o = add_pvar_o((p, l, r))
-                g.add_clause([-x, o])
-        
-        # (Termination)
-        if TERMINATION:
-            for (labels, _rewards) in prefixes(X, without_terminal=True):
-                if labels == ():
-                    continue
-                lm = labels[0:-1]
-                l = labels[-1]
-                x_2 = add_pvar_x((labels, TERMINAL_STATE)) # TODO REMOVE unneeded
-                for p in all_states_here(n_states):
-                    if p == TERMINAL_STATE:
-                        continue
-                    x_1 = add_pvar_x((lm, p))
-                    d = add_pvar_d((p, l, TERMINAL_STATE))
-                    g.add_clause([-x_1, -d])
-
-            for (labels, rewards) in X:
-                if labels == ():
-                    continue
-                lm = labels[0:-1]
-                l = labels[-1]
-                x_2 = add_pvar_x((labels, TERMINAL_STATE)) # TODO REMOVE unneeded
-                for p in all_states_here(n_states):
-                    if p == TERMINAL_STATE:
-                        continue
-                    x_1 = add_pvar_x((lm, p))
-                    d = add_pvar_d((p, l, TERMINAL_STATE))
-                    d_t = -d if (labels, rewards) in X_tl else d
-                    g.add_clause([-x_1, d_t])
-
-            for p in all_states_here(n_states):
-                if p == TERMINAL_STATE:
-                    continue
-                for l in language:
-                    d = add_pvar_d((TERMINAL_STATE, l, p))
-                    g.add_clause([-d])
-
-            for p in all_states_here(n_states):
-                for l in language:
-                    o = add_pvar_o((TERMINAL_STATE, l, 0.0))
-                    g.add_clause([o])
-
-        found = False
-        # (Relevant events)
-        for relevant in powerset(language):
-            assumptions = []
-            for p in all_states_here(n_states):
-                if p == TERMINAL_STATE:
-                    continue
-                for l in language:
-                    if l in relevant:
-                        continue
-                    d = add_pvar_d((p, l, p))
-                    o = add_pvar_o((p, l, 0.0))
-                    assumptions.extend([d, o])
-            g.solve(assumptions=assumptions)
-            # if len(relevant) == len(language):
-            #     IPython.embed()
-            if g.get_model() is None:
-                continue
-            else:
-                found = True
-                if report:
-                    print(f"found with assumptions {relevant}")
-                break
-
-        if not found:
-            continue
-        # g.solve()
-        # if g.get_model() is None:
-        #     continue
-
-        # if report:
-        #     print("found")
-
-        transitions = dict() #defaultdict(lambda: [None, None]) # maps (state, true_props) to (state, reward)
-
-        for pvar in g.get_model():
-            if abs(pvar) in prop_d:
-                if pvar > 0:
-                    (p, l, q) = prop_d[abs(pvar)]
-                    # assert transitions[(p, tuple(l))][0] is None
-                    if (p, tuple(l)) not in transitions:
-                        transitions[(p, tuple(l))] = [None, None]
-                    transitions[(p, tuple(l))][0] = q
-                    # assert q is not None
-            elif abs(pvar) in prop_o:
-                if pvar > 0:
-                    (p, l, r) = prop_o[abs(pvar)]
-                    if (p, tuple(l)) not in transitions:
-                        transitions[(p, tuple(l))] = [None, None]
-                    # assert transitions[(p, tuple(l))][1] is None
-                    transitions[(p, tuple(l))][1] = r
-            elif abs(pvar) in prop_x:
-                pass
-            else:
-                raise ValueError("Uknown p-var dict")
-        
-        g.delete()
-        return transitions, n_states
+        st = sat_hyp(0.15, X, X_tl, n_states)
+        if st is not None:
+            display_transitions(st, "st")
+            return st, n_states
+        continue
 
     raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
 
@@ -253,7 +78,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         output1 = rm_run(labels, H1)
         output2 = rm_run(labels, H2)
-        if run_sum_approx_eqv(output1, output2):
+        if run_eqv2(MINIMIZATION_EPSILON, output1, output2):
             eqv += 1
         # if rm_run(labels, H1) == rm_run(labels, H2):
         #     eqv += 1
@@ -330,10 +155,10 @@ def learn(env,
 
         while True:
             # Selecting and executing the action
-            if num_episodes % 10 != 0:
-                a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
-            else:
-                a = random.choice(actions)
+            # if num_episodes % 10 != 0:
+            a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
+            # else:
+            #     a = random.choice(actions)
             sn, r, done, info = env.step(a)
 
             if random.random() <= NOISE_PROB and r == 1:
@@ -387,9 +212,9 @@ def learn(env,
             #         print(f"added artificial {(tuple(labels2), tuple(rewards2))})")
             #         X_new.add((tuple(labels2), tuple(rewards2)))
 
-            if step >= 1e6:
+            if step >= 2e5:
                 language = sample_language(X)
-                t, _ = consistent_hyp(X, X_tl, n_states_start=5)
+                t=transitions
                 IPython.embed()
 
             # moving to the next state
@@ -414,8 +239,8 @@ def learn(env,
                 # if not ((not run_approx_eqv(rm_run(labels, H), rewards)) == force_cx):
                 #     IPython.embed()
 
-                if not run_approx_eqv(rm_run(labels, H), rewards) or force_cx:
-                    force_cx=False
+                if not run_eqv2(MINIMIZATION_EPSILON, rm_run(labels, H), rewards) or force_cx:
+                    force_cx=False # TODO remove
                     X_new.add((tuple(labels), tuple(rewards)))
                     # if env.current_u_id != TERMINAL_STATE:
                     #     X_tl.add((tuple(labels), tuple(rewards)))

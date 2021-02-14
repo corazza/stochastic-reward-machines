@@ -6,111 +6,134 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transition, report=True, inspect=False, display=False):
-    def delta_A(p_A, a):
-        a = tuple(a)
-        if (p_A, a) in transitions:
-            return transitions[(p_A, a)][0]
-        else:
-            return TERMINAL_STATE
-    def sigma_A(p_A, a):
-        a = tuple(a)
-        if (p_A, a) in transitions:
-            return transitions[(p_A, a)][1]
-        else:
-            return 0.0
+def smt_hyp(epsilon, X, X_tl, n_states, report=True, inspect=False, display=False):
+    language = sample_language(X)
+    empty_transition = dnf_for_empty(language)
+    reward_alphabet = sample_reward_alphabet(X)
 
     d_dict = dict()
-    x_dict = dict()
     o_dict = dict()
+    x_dict = dict()
     y_dict = dict()
     z_dict = dict()
-
-    s = Solver()
-    # TODO REMOVE
-    s.set(unsat_core=True)
     
-    for p in all_states_here(n_states):
-        for a in language:
-            o_dict[(p, a)] = Real(f"o/{p}-{a}")
+    s = Solver()
 
     for p in all_states_here(n_states):
         for a in language:
             for q in all_states_here(n_states):
                 d_dict[(p, a, q)] = Bool(f"d/{p}-{a}-{q}")
 
-    for p_A in all_states_here(n_states_A):
-        for p in all_states_here(n_states):
-            x_dict[(p_A, p)] = Bool(f"x/{p_A}-{p}")
-            y_dict[(p_A, p)] = Real(f"y/{p_A}-{p}")
-            z_dict[(p_A, p)] = Real(f"z/{p_A}-{p}")
+    for p in all_states_here(n_states):
+        for a in language:
+            o_dict[(p, a)] = Real(f"o/{p}-{a}")
 
+    for p in all_states_here(n_states):
+        z_dict[p] = Real(f"z/{p}")
+        y_dict[p] = Real(f"y/{p}")
+
+    def add_x(ls, p):
+        nonlocal x_dict
+        if (ls, p) not in x_dict:
+            x_dict[(ls, p)] = Bool(f"x/{len(x_dict)}")
+        return x_dict[(ls, p)]
+
+    # Encoding reward machines
     # (1)
     for p in all_states_here(n_states):
-        for a in language:
+        for l in language:
             disj = []
             for q in all_states_here(n_states):
-                disj.append(d_dict[(p, a, q)])
-            disj = Or(*disj)
-            s.add(disj)
-
-    for p in all_states_here(n_states):
-        for a in language:
+                disj.append(d_dict[p, l, q])
+            s.add(Or(*disj))
             for q1 in all_states_here(n_states):
                 for q2 in all_states_here(n_states):
                     if q1 == q2:
                         continue
-                    s.add(Or(Not(d_dict[(p, a, q1)]), Not(d_dict[(p, a, q2)])))
+                    p_l_q1 = d_dict[(p, l, q1)]
+                    p_l_q2 = d_dict[(p, l, q2)]
+                    s.add(Or(Not(p_l_q1), Not(p_l_q2)))
 
-    # (2)
-    s.add(x_dict[(INITIAL_STATE, INITIAL_STATE)])
+    # Consistency with sample
+    # (3)
+    s.add(add_x(tuple(), INITIAL_STATE)) # starts in the initial state
+    for p in all_states_here(n_states):
+        if p == INITIAL_STATE:
+            continue
+        s.add(Not(add_x(tuple(), p)))
+
+    # (4)
+    for (labels, _rewards) in prefixes(X, without_terminal=False):
+        if labels == ():
+            continue
+        lm = labels[0:-1]
+        l = labels[-1]
+        for p in all_states_here(n_states):
+            for q in all_states_here(n_states):
+                x_1 = add_x(lm, p)
+                d = d_dict[(p, l, q)]
+                x_2 = add_x(labels, q)
+                s.add(Implies(And(x_1, d), x_2))
+
+    # (5)
+    for (labels, rewards) in prefixes(X, without_terminal=False):
+        if labels == ():
+            continue
+        lm = labels[0:-1]
+        l = labels[-1]
+        r = rewards[-1]
+        for p in all_states_here(n_states):
+            x = add_x(lm, p)
+            o = o_dict[(p, l)]
+            z_p = z_dict[p]
+            y_p = y_dict[p]
+            for q in all_states_here(n_states):
+                z_q = z_dict[q]
+                y_q = y_dict[q]
+                d = d_dict[(p, l, q)]
+                s.add(Implies(And(x, d), y_q >= y_p + (r - o)))
+                s.add(Implies(And(x, d), z_q <= z_p + (r - o)))
 
     for p in all_states_here(n_states):
-        for q in all_states_here(n_states):
-            for p_A in all_states_here(n_states_A):
-                for a in language:
-                    q_A = delta_A(p_A, a)
-                    if q_A == TERMINAL_STATE and not TERMINATION:
-                        continue
-                    x_p = x_dict[(p_A, p)]
-                    x_q = x_dict[(q_A, q)]
-                    d = d_dict[(p, a, q)]
-                    y_p = y_dict[(p_A, p)]
-                    y_q = y_dict[(q_A, q)]
-                    z_p = z_dict[(p_A, p)]
-                    z_q = z_dict[(q_A, q)]
-                    o = o_dict[(p, a)]
-                    o_A = sigma_A(p_A, a)
-                    # (3)
-                    s.add(Implies(And(x_p, d), x_q))
-                    # (4)
-                    s.add(Implies(And(x_p, d), y_q >= y_p + (o_A - o)))
-                    # s.add(Implies(d, y_q >= y_p + (o_A - o)))
-                    # (5)
-                    s.add(Implies(And(x_p, d), z_q <= z_p + (o_A - o)))
-                    # s.add(Implies(d, z_q <= z_p + (o_A - o)))
+        z_p = z_dict[p]
+        y_p = y_dict[p]
+        s.add(z_p <= y_p)
+        s.add(z_p >= -epsilon, y_p <= epsilon)
 
-    # (6)
-    for p_A in all_states_here(n_states_A):
-        for p in all_states_here(n_states):
-            z_p = z_dict[(p_A, p)]
-            y_p = y_dict[(p_A, p)]
-            s.add(z_p <= y_p)
+    z_qi = z_dict[INITIAL_STATE]
+    y_qi = y_dict[INITIAL_STATE]
 
-    # (7)
-    z_qi = z_dict[(INITIAL_STATE, INITIAL_STATE)]
-    y_qi = y_dict[(INITIAL_STATE, INITIAL_STATE)]
     s.add(z_qi <= 0, y_qi >= 0)
-
-    # (8)
-    for p_A in all_states_here(n_states_A):
-        for p in all_states_here(n_states):
-            y_p = y_dict[(p_A, p)]
-            z_p = z_dict[(p_A, p)]
-            s.add(z_p >= -epsilon, y_p <= epsilon)
 
     # (Termination)
     if TERMINATION:
+        for (labels, _rewards) in prefixes(X, without_terminal=True):
+            if labels == ():
+                continue
+            lm = labels[0:-1]
+            l = labels[-1]
+            x_2 = add_x(labels, TERMINAL_STATE) # TODO REMOVE unneeded
+            for p in all_states_here(n_states):
+                if p == TERMINAL_STATE:
+                    continue
+                x_1 = add_x(lm, p)
+                d = d_dict[(p, l, TERMINAL_STATE)]
+                s.add(Implies(x_1, Not(d)))
+
+        for (labels, rewards) in X:
+            if labels == ():
+                continue
+            lm = labels[0:-1]
+            l = labels[-1]
+            x_2 = add_x(labels, TERMINAL_STATE) # TODO REMOVE unneeded
+            for p in all_states_here(n_states):
+                if p == TERMINAL_STATE:
+                    continue
+                x_1 = add_x(lm, p)
+                d = d_dict[(p, l, TERMINAL_STATE)]
+                d_t = Not(d) if (labels, rewards) in X_tl else d
+                s.add(Implies(x_1, d_t))
+
         for p in all_states_here(n_states):
             if p == TERMINAL_STATE:
                 continue
@@ -124,15 +147,12 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
                 s.add(o == 0.0)
 
     if report:
-        print(f"SMT SOLVING ({n_states}/{n_states_A}, epsilon={epsilon})")
+        print(f"SMT SOLVING ({n_states}, epsilon={epsilon})")
 
     result = s.check()
     if report:
         print(result)
-    # if result == unsat:
-    #         import IPython
-    #         IPython.embed()
-    #         exit()
+
     if result == sat:
         model = s.model()
         stransitions = dict()
@@ -148,36 +168,9 @@ def smt_hyp(epsilon, language, n_states, n_states_A, transitions, empty_transiti
                 stransitions[(p, tuple(a))] = [q, o]
 
         if display:
-            display_transitions(transitions, f"smt_original{n_states}-{n_states_A}")
-            display_transitions(stransitions, f"smt_approximation{n_states}-{n_states_A}")
-        
-        if inspect:
-            display_transitions(transitions, "given")
-            display_transitions(stransitions, "smt")
-
-            def get_d(p, l, q):
-                print(f"{d_dict[(p, l, q)]} = {model[d_dict[(p, l, q)]]}")
-
-            def get_o(p, l):
-                print(f"{o_dict[(p, l)]} = {model[o_dict[(p, l)]]}")
-
-            def get_x(p_A, p):
-                print(f"{x_dict[(p_A, p)]} = {model[x_dict[(p_A, p)]]}")
-
-            def get_y(p_A, p):
-                print(f"{y_dict[(p_A, p)]} = {model[y_dict[(p_A, p)]]}")
-
-            def get_z(p_A, p):
-                print(f"{z_dict[(p_A, p)]} = {model[z_dict[(p_A, p)]]}")
-
-            for p_A in all_states_here(n_states_A):
-                for p in all_states_here(n_states):
-                    get_x(p_A, p)
-
-            import IPython
-            IPython.embed()
-            exit()
+            display_transitions(stransitions, f"smttt{n_states}")
 
         return stransitions
     else:
         return None
+        

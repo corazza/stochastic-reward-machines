@@ -46,6 +46,17 @@ def run_sum_approx_eqv(output1, output2):
     sum2 = sum(output2)
     return abs(sum1 - sum2) <= 3*EXACT_EPSILON
 
+def run_eqv2(epsilon, output1, output2):
+    if len(output1) != len(output2):
+        return False
+    sum1 = 0
+    sum2 = 0
+    for i in range(0, len(output1)):
+        sum1 += output1[i]
+        sum2 += output2[i]
+        if abs(sum1 - sum2) > epsilon:
+            return False
+    return True
 
 def sample_language(X):
     """
