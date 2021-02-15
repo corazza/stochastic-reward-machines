@@ -40,10 +40,15 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
     for n_states in range(n_states_start, MAX_RM_STATES_N+1):
         if report:
             print(f"finding model with {n_states} states")
-        st = sat_hyp(0.15, X, X_tl, n_states)
-        if st is not None:
-            display_transitions(st, "st")
-            return st, n_states
+        # print("(SMT)")
+        new_transitions = smt_hyp(0.15, X, X_tl, n_states)
+        # print("(SAT)")
+        # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
+        if new_transitions is not None:
+            # if new_transitions_sat is None:
+            #     print(f"SAT couldn't find anything with n_states={n_states}")
+            display_transitions(new_transitions, "st")
+            return new_transitions, n_states
         continue
 
     raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
@@ -149,21 +154,17 @@ def learn(env,
         labels = []
         rewards = []
         next_random = False
-        force_cx=False
 
         if s not in Q[rm_state]: Q[rm_state][s] = dict([(a, q_init) for a in actions])
 
         while True:
             # Selecting and executing the action
-            # if num_episodes % 10 != 0:
             a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
-            # else:
-            #     a = random.choice(actions)
             sn, r, done, info = env.step(a)
 
-            if random.random() <= NOISE_PROB and r == 1:
-                direction = 1.0 if random.random() <= 0.5 else 1.0
-                # r += NOISE * direction
+            # if random.random() <= NOISE_PROB and r == 1:
+            #     direction = 1.0 if random.random() <= 0.5 else 1.0
+            #     r += NOISE * direction
 
             sn = tuple(sn)
             true_props = env.get_events()
@@ -175,6 +176,10 @@ def learn(env,
             if done: _delta = r - Q[rm_state][s][a]
             else:    _delta = r + gamma*get_qmax(Q[next_rm_state], sn, actions, q_init) - Q[rm_state][s][a]
             Q[rm_state][s][a] += lr*_delta
+
+
+            if r == 0.95:
+                print("still hapenning")
 
             # counterfactual updates
             for v in H.get_states():
@@ -190,31 +195,10 @@ def learn(env,
                 rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
             else:
                 next_random = True
-                if not done:
-                    force_cx=True
 
-            # if n_states_last >= 5:
-            #     labels2=[]
-            #     rewards2=[]
-            #     while True:
-            #         l = random.choice(list(language))
-            #         labels2.append(l)
-            #         rewards2 = rm_run(labels2, env.current_rm)
-            #         # print(labels2, rewards2)
-            #         # IPython.embed()
-            #         if len(labels2) > len(rewards2):
-            #             break
-            #     labels2.pop()
-            #     assert len(labels2) == len(rewards2)
-            #     assert rewards2 == rm_run(labels2, env.current_rm)
-
-            #     if not run_approx_eqv(rm_run(labels2, H), rewards2) or force_cx:
-            #         print(f"added artificial {(tuple(labels2), tuple(rewards2))})")
-            #         X_new.add((tuple(labels2), tuple(rewards2)))
-
-            if step >= 2e5:
+            if step >= 1e6:
                 language = sample_language(X)
-                t=transitions
+                t = transitions
                 IPython.embed()
 
             # moving to the next state
@@ -232,21 +216,12 @@ def learn(env,
                 reward_total = 0
                 total_episodes = 0
             if done:
-                # print("DONE")
                 num_episodes += 1
                 total_episodes += 1
-                # if rm_run(labels, H) != rewards:
-                # if not ((not run_approx_eqv(rm_run(labels, H), rewards)) == force_cx):
-                #     IPython.embed()
 
-                if not run_eqv2(MINIMIZATION_EPSILON, rm_run(labels, H), rewards) or force_cx:
-                    force_cx=False # TODO remove
+                if not run_eqv2(MINIMIZATION_EPSILON, rm_run(labels, H), rewards):
                     X_new.add((tuple(labels), tuple(rewards)))
-                    # if env.current_u_id != TERMINAL_STATE:
-                    #     X_tl.add((tuple(labels), tuple(rewards)))
-                    #     IPython.embed()
                     if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
-                        # IPython.embed()
                         tl = info["TimeLimit.truncated"]
                         if tl:
                             X_tl.add((tuple(labels), tuple(rewards)))
@@ -263,7 +238,5 @@ def learn(env,
                     H = H_new
                     transitions = transitions_new
                     Q = transfer_Q(H_new, H, Q, X)
-                    # if len(X) > X_PRUNE_MIN_SIZE:
-                    #     X = prune_X(X, transitions, n_states_last)
                 break
             s = sn

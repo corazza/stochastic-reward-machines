@@ -250,3 +250,23 @@ def powerset(iterable):
     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
     s = list(iterable)
     return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s)+1))
+
+def new_artificial_cx(H, env_rm, X):
+    language = sample_language(X)
+    X_new = set()
+    labels = []
+    rewards = []
+    while True:
+        l = random.choice(list(language))
+        labels.append(l)
+        rewards = rm_run(labels, env_rm)
+        if len(labels) > len(rewards):
+            break
+    labels.pop()
+    assert len(labels) == len(rewards)
+    assert rewards == rm_run(labels, env_rm)
+
+    if not run_approx_eqv(rm_run(labels, H), rewards):
+        X_new.add((tuple(labels), tuple(rewards)))
+
+    return X_new
