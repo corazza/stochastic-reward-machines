@@ -1,4 +1,4 @@
-0 # initial state || improved t4.txt, use labelfunction
+0 # initial state
 [7] # terminal state
 (0,0,'!a&!b',ConstantRewardFunction(0))
 (0,1,'a&!b',ConstantRewardFunction(0))

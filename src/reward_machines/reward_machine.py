@@ -117,8 +117,10 @@ class RewardMachine:
         """
         # Reading the file
         f = open(file)
-        lines = [l.rstrip() for l in f]
+        lines = (line.rstrip() for line in f)
+        lines = list(line for line in lines if line)
         f.close()
+        print(lines)
         # setting the DFA
         self.u0 = eval(lines[0])
         terminal_states = eval(lines[1])

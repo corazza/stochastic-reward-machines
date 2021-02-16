@@ -196,7 +196,7 @@ def learn(env,
             else:
                 next_random = True
 
-            if step >= 1e6:
+            if step >= 2e5:
                 language = sample_language(X)
                 t = transitions
                 IPython.embed()

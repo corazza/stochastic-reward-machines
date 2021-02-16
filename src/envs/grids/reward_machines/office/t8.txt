@@ -1,0 +1,29 @@
+0 # initial state || COLLECT A-B-C
+
+[7] # terminal state
+
+(0,0,'!a&!b&!c',ConstantRewardFunction(0))
+
+(0,1,'a&!b&!c',ConstantRewardFunction(0)) # A-B-C
+(0,2,'!a&b&!c',ConstantRewardFunction(0)) # B-A-C
+(0,3,'!a&!b&c',ConstantRewardFunction(0)) # C-A-B
+
+
+(1,1,'!b',ConstantRewardFunction(0))
+(1,4,'b',ConstantRewardFunction(0))
+
+(2,2,'!a',ConstantRewardFunction(0))
+(2,5,'a',ConstantRewardFunction(0))
+
+(3,3,'!a',ConstantRewardFunction(0))
+(3,6,'a',ConstantRewardFunction(0))
+
+
+(4,4,'!c',ConstantRewardFunction(0))
+(4,7,'c',ConstantRewardFunction(1))
+
+(5,5,'!c',ConstantRewardFunction(0))
+(5,7,'c',ConstantRewardFunction(1))
+
+(6,6,'!b',ConstantRewardFunction(0))
+(6,7,'b',ConstantRewardFunction(1))

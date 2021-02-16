@@ -182,6 +182,20 @@ def rm_from_transitions(transitions, empty_transition):
 
     return RewardMachine(filename)
 
+
+def rm_to_transitions(rm):
+    transitions = dict()
+    for (u1, tr) in rm.delta_u.items():
+        for (dnf, u2) in tr.items():
+            transitions[(u1, dnf)] = [u2, 0.0]
+
+    # for (u1, tr) in rm.delta_r.items():
+    #     for (u2, r) in tr.items():
+    #         transitions[(u1, dnf)] = [u2, 0.0]
+
+    return transitions
+
+
 def initial_Q(H):
     """
     Returns a set of uninitialized q-functions indexed by states of RM H
@@ -238,13 +252,6 @@ def all_states_here(asdf):
 def write_to_asdf(s):
     with open("asdf.txt", "w") as asdf:
         asdf.write(s)
-
-def rm_to_transitions(rm):
-    transitions = dict()
-    for (u1, tr) in rm.delta_u.items():
-        for (dnf, u2) in tr.items():
-            transitions[(u1, dnf)] = [u2, 0.0]
-    return transitions
 
 def powerset(iterable):
     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
