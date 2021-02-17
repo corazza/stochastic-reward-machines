@@ -33,15 +33,15 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
     """
     if len(X) == 0:
         transitions = dict()
-        transitions[(1, tuple())] = [1, 0.0]
-        transitions[(2, tuple())] = [1, 0.0]
+        transitions[(0, tuple())] = [0, 0.0]
+        transitions[(1, tuple())] = [0, 0.0]
         return transitions, 2
     # TODO intercept empty X here
     for n_states in range(n_states_start, MAX_RM_STATES_N+1):
         if report:
             print(f"finding model with {n_states} states")
         # print("(SMT)")
-        new_transitions = smt_hyp(0.15, X, X_tl, n_states)
+        new_transitions = sat_hyp(0.15, X, X_tl, n_states)
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
         if new_transitions is not None:
@@ -177,10 +177,6 @@ def learn(env,
             else:    _delta = r + gamma*get_qmax(Q[next_rm_state], sn, actions, q_init) - Q[rm_state][s][a]
             Q[rm_state][s][a] += lr*_delta
 
-
-            if r == 0.95:
-                print("still hapenning")
-
             # counterfactual updates
             for v in H.get_states():
                 if v == rm_state:
@@ -196,9 +192,10 @@ def learn(env,
             else:
                 next_random = True
 
-            if step >= 2e5:
-                language = sample_language(X)
-                t = transitions
+            if len(X_new) > 50:
+                language = sample_language(X_new)
+                rm = env.current_rm
+                t_rm = rm_to_transitions(rm)
                 IPython.embed()
 
             # moving to the next state

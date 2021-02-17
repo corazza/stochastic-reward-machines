@@ -120,7 +120,6 @@ class RewardMachine:
         lines = (line.rstrip() for line in f)
         lines = list(line for line in lines if line)
         f.close()
-        print(lines)
         # setting the DFA
         self.u0 = eval(lines[0])
         terminal_states = eval(lines[1])

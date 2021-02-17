@@ -5,6 +5,7 @@ from collections import defaultdict
 from graphviz import Digraph
 import IPython
 
+from rl_agents.jirp.dnf_compile import compile_dnf, evaluate_dnf_compiled
 from reward_machines.reward_machine import RewardMachine
 
 from rl_agents.jirp.consts import *
@@ -125,7 +126,7 @@ def different_pairs_ordered(xs):
             yield (xs[i], xs[j])
 
 def all_states(n_states):
-    return range(INITIAL_STATE, n_states+1)
+    return range(INITIAL_STATE, n_states)
 
 def all_states_terminal(n_states):
     return itertools.chain(all_states(n_states), [TERMINAL_STATE])
@@ -163,7 +164,7 @@ def rm_from_transitions(transitions, empty_transition):
         else:
             delta_r[p][q].append((conj, r))
     
-    rm_strings = [f"{INITIAL_STATE}", f"[]"]
+    rm_strings = [f"{INITIAL_STATE}", f"[{TERMINAL_STATE}]"]
 
     for p in delta_u:
         for q in delta_u[p]:
@@ -182,17 +183,19 @@ def rm_from_transitions(transitions, empty_transition):
 
     return RewardMachine(filename)
 
-
 def rm_to_transitions(rm):
     transitions = dict()
-    for (u1, tr) in rm.delta_u.items():
-        for (dnf, u2) in tr.items():
-            transitions[(u1, dnf)] = [u2, 0.0]
-
-    # for (u1, tr) in rm.delta_r.items():
-    #     for (u2, r) in tr.items():
-    #         transitions[(u1, dnf)] = [u2, 0.0]
-
+    for (u1, trs) in rm.delta_u.items():
+        for (u2, dnf) in trs.items():
+            (true_for, chars) = compile_dnf(dnf)
+            not_chars = tuple(map(lambda char: f"!{char}",chars))
+            labels = [tuple(label) for label in true_for]
+            for label in labels:
+                _, r, _ = rm.step(u1, label, {})
+                if label == ():
+                    transitions[(u1, not_chars)] = [u2, r]
+                else:
+                    transitions[(u1, label)] = [u2, r]
     return transitions
 
 

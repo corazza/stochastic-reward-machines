@@ -6,19 +6,20 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-def smt_approx(epsilon, language, n_states, n_states_A, transitions, empty_transition, report=True, inspect=False, display=False):
+def smt_approx(epsilon, language, n_states, n_states_A, transitions, report=True, inspect=False, display=False):
+    rm = rm_from_transitions(transitions, dnf_for_empty(language))
     def delta_A(p_A, a):
         a = tuple(a)
-        if (p_A, a) in transitions:
-            return transitions[(p_A, a)][0]
-        else:
-            return TERMINAL_STATE
+        if p_A == rm.terminal_u:
+            return rm.terminal_u
+        u2, rew, _done = rm.step(p_A, a, {})
+        return u2
     def sigma_A(p_A, a):
         a = tuple(a)
-        if (p_A, a) in transitions:
-            return transitions[(p_A, a)][1]
-        else:
+        if p_A == rm.terminal_u:
             return 0.0
+        u2, rew, _done = rm.step(p_A, a, {})
+        return rew
 
     d_dict = dict()
     x_dict = dict()
