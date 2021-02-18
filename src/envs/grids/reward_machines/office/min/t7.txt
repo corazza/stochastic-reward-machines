@@ -1,0 +1,10 @@
+0 # initial state || Task seven, c-b-a
+
+[3] # terminal state
+
+(0,0,'!c',ConstantRewardFunction(0))
+(0,1,'c',ConstantRewardFunction(0))
+(1,1,'!b',ConstantRewardFunction(0))
+(1,2,'b',ConstantRewardFunction(0))
+(2,2,'!a',ConstantRewardFunction(0))
+(2,3,'a',ConstantRewardFunction(1.02))

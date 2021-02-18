@@ -280,3 +280,119 @@ def new_artificial_cx(H, env_rm, X):
         X_new.add((tuple(labels), tuple(rewards)))
 
     return X_new
+
+# TODO use in approx etc.
+def n_states_transitions(transitions):
+    keys = transitions.keys()
+    states = set(map(lambda x: x[0], keys))
+    return len(states) - 1 # discounting terminal state
+
+def transitions_from(p, transitions):
+    result = dict()
+    for (p2, a) in transitions:
+        if p != p2:
+            continue
+        result[a] = transitions[(p, a)]
+    return result
+    
+def reachable(p, transitions):
+    result = set()
+    for (p2, a) in transitions:
+        if p != p2:
+            continue
+        result.add(transitions[(p2,a)][0])
+    return result
+
+def load_t(n):
+    return RewardMachine(f"./envs/grids/reward_machines/office/t{n}.txt")
+
+def load_m(n):
+    return RewardMachine(f"./envs/grids/reward_machines/office/min/t{n}.txt")
+
+def sum_rm(language,rm1,rm2):
+    n1 = len(rm1.U)
+    n2 = len(rm2.U)
+    def sum_state(p, first):
+        nonlocal n1
+        if first:
+            return p
+        if p == 0 or p == -1:
+            return p
+        return n1 - 1 + p
+    transitions = dict()
+    for i1 in range(0, n1):
+        i = sum_state(i1,True)
+        for labels in language:
+            j1, r1, _ = rm1.step(i1, labels, {})
+            j = sum_state(j1,True)
+            transitions[(i,labels)]=[j,r1]
+    for i2 in range(0, n2):
+        i = sum_state(i2,False)
+        for labels in language:
+            j2, r2, _ = rm2.step(i2, labels, {})
+            j = sum_state(j2,False)
+            transitions[(i,labels)]=[j,r2]
+    return transitions
+
+def product_rm(language, rm1, rm2):
+    # language = list(filter(lambda x: len(x)>0, language)) # implicit in powerset
+    n1 = len(rm1.U)
+    n2 = len(rm2.U)
+
+    def product_state(p1, p2):
+        nonlocal n1
+        nonlocal n2
+        if p1 == -1 or p2 == -1:
+            return -1
+        # if p1 == -1:
+        #     p1 = n1
+        # if p2 == -1:
+        #     p2 = n2
+        return (n2)*p1 + p2
+
+    # IPython.embed()
+
+    transitions = dict()
+    for i1 in range(0, n1):
+        for i2 in range(0, n2):
+            i = product_state(i1,i2)
+            for labels in language: # TODO doesn't work for labels with multiple events
+                j1, r1, _ = rm1.step(i1, labels, {})
+                j2, r2, _ = rm2.step(i2, labels, {})
+                j = product_state(j1,j2)
+                transitions[(i,labels)] = [j,r1+r2]
+    
+    # IPython.embed()
+
+    visited = set()
+    to_visit= [-1,0]
+
+    while to_visit:
+        c = to_visit.pop()
+        visited.add(c)
+        ns = reachable(c, transitions)
+        for n in ns:
+            if n not in visited:
+                to_visit.append(n)
+
+    result = dict()
+
+    state_dict = dict()
+    state_dict[0]=0
+    state_dict[-1]=-1
+    def add_state(p):
+        nonlocal state_dict
+        if p not in state_dict:
+            state_dict[p] = len(state_dict) - 1
+        return state_dict[p]
+
+    for (p, a) in transitions:
+        if p in visited:
+            [q, r] = transitions[(p, a)]
+            p2 = add_state(p)
+            q2 = add_state(q)
+            result[(p2, a)] = [q2,r]
+    
+    # IPython.embed()
+
+    return result

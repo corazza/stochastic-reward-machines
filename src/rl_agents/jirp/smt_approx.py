@@ -6,8 +6,8 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-def smt_approx(epsilon, language, n_states, n_states_A, transitions, report=True, inspect=False, display=False):
-    rm = rm_from_transitions(transitions, dnf_for_empty(language))
+def smt_approx(epsilon, language, n_states, rm, report=True, inspect=False, display=False):
+    n_states_A = len(rm.U)
     def delta_A(p_A, a):
         a = tuple(a)
         if p_A == rm.terminal_u:

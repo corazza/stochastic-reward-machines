@@ -6,29 +6,30 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-def mip_approx(_epsilon, language, n_states, n_states_A, transitions, empty_transition, report=True, inspect=False, display=False):
-    def delta_A(p_a, a):
+def mip_approx(_epsilon, language, n_states, rm, report=True, inspect=False, display=False):
+    n_states_A = len(rm.U)
+    def delta_A(p_A, a):
         a = tuple(a)
-        if (p_a, a) in transitions:
-            return transitions[(p_a, a)][0]
-        else:
-            return TERMINAL_STATE
-    def sigma_A(p_a, a):
+        if p_A == rm.terminal_u:
+            return rm.terminal_u
+        u2, rew, _done = rm.step(p_A, a, {})
+        return u2
+    def sigma_A(p_A, a):
         a = tuple(a)
-        if (p_a, a) in transitions:
-            return transitions[(p_a, a)][1]
-        else:
+        if p_A == rm.terminal_u:
             return 0.0
+        u2, rew, _done = rm.step(p_A, a, {})
+        return rew
 
-    reward_bound = 1000.0
-    epsilon_bound = 1000.0
-    interval_bound = 10000.0
+    reward_bound = 100.0
+    epsilon_bound = 100.0
+    interval_bound = 1000.0
 
     m = Model()
-    m.verbose = 0
-    # m.emphasis = 1
+    # m.verbose = 0
+    m.emphasis = 1
     m.threads = -1
-    # m.pump_passes = 300
+    m.pump_passes = 300
 
     epsilon = m.add_var(var_type=CONTINUOUS, ub=epsilon_bound)
     m.objective = minimize(epsilon)
