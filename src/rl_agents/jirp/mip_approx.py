@@ -6,7 +6,7 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-def mip_approx(_epsilon, language, n_states, rm, report=True, inspect=False, display=False):
+def mip_approx(epsilon_fixed, language, n_states, rm, report=True, inspect=False, display=False):
     n_states_A = len(rm.U)
     def delta_A(p_A, a):
         a = tuple(a)
@@ -21,18 +21,18 @@ def mip_approx(_epsilon, language, n_states, rm, report=True, inspect=False, dis
         u2, rew, _done = rm.step(p_A, a, {})
         return rew
 
-    reward_bound = 100.0
-    epsilon_bound = 100.0
-    interval_bound = 1000.0
+    reward_bound = 1.5
+    epsilon_bound = 1.0
+    interval_bound = 5.0
 
     m = Model()
     # m.verbose = 0
     m.emphasis = 1
     m.threads = -1
-    m.pump_passes = 300
+    m.pump_passes = 150
 
     epsilon = m.add_var(var_type=CONTINUOUS, ub=epsilon_bound)
-    m.objective = minimize(epsilon)
+    m.objective = minimize(epsilon) if epsilon_fixed is None else 1
 
     d_dict = dict()
     x_dict = dict()
@@ -55,7 +55,8 @@ def mip_approx(_epsilon, language, n_states, rm, report=True, inspect=False, dis
             for a in language:
                 d_dict[(p, a, q)] = m.add_var(var_type=BINARY)
 
-    m += epsilon <= MINIMIZATION_EPSILON * 2.0
+    if epsilon_fixed:
+        m += epsilon == epsilon_fixed
 
     # (i)
     m += epsilon >= 0

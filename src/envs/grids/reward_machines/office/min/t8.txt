@@ -1,0 +1,12 @@
+0 # initial state || f-g-f-g
+
+[4] # terminal state
+
+(0,0,'!f',ConstantRewardFunction(0))
+(0,1,'f',ConstantRewardFunction(0))
+(1,1,'!g',ConstantRewardFunction(0))
+(1,2,'g',ConstantRewardFunction(0))
+(2,2,'!f',ConstantRewardFunction(0))
+(2,3,'f',ConstantRewardFunction(0))
+(3,3,'!g',ConstantRewardFunction(0))
+(3,4,'f',ConstantRewardFunction(0.9))

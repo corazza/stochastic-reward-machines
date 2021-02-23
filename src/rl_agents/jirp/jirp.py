@@ -147,21 +147,26 @@ def learn(env,
     actions = list(range(env.action_space.n))
     Q = initial_Q(H)
 
-    rms = [load_m(i) for i in range(0, 3)]
-    language={"","a","b","c"}
+    rms = [load_c(i) for i in range(1, 11)]
+    language={"","a", "b","f", "c","e", "d"}
     empty_transition=dnf_for_empty(language)
+    rm1 = load_c(3)
+    rm2 = load_c(8)
+    t = product_rm(language, rm1, rm2)
+    rm = rm_from_transitions(t, empty_transition)
     IPython.embed()
-    rm = rms[0]
-    t=None
-    for i in range(1, len(rms)):
-        t=product_rm(language, rm, rms[i])
-        rm = rm_from_transitions(t, empty_transition)
+
+    # rm = rms[0]
+    # t=None
+    # for i in range(1, len(rms)):
+    #     t=product_rm(language, rm, rms[i])
+    #     rm = rm_from_transitions(t, empty_transition)
+    # # IPython.embed()
+    # for i in range(8, 20):
+    #     t2=smt_approx(0.4,language,i,rm)
+    #     if t2 is not None:
+    #         break
     # IPython.embed()
-    for i in range(8, 20):
-        t2=smt_approx(0.4,language,i,rm)
-        if t2 is not None:
-            break
-    IPython.embed()
 
     while step < total_timesteps:
         s = tuple(env.reset())

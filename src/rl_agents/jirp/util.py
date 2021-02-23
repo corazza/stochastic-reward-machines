@@ -237,6 +237,22 @@ def display_transitions(transitions, name):
     dot = dot.unflatten()
     dot.render(f"graphviz/{name}.gv", view=True)
 
+def display_rm(rm, name):
+    dot = Digraph(comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
+
+    nodes = set()
+
+    dot.node("-1")
+    for p in rm.U:
+        dot.node(str(p))
+
+    for p in rm.U:
+        for q in rm.delta_u[p]:
+            dot.edge(str(p),str(q),label=f"({rm.delta_u[p][q]},{rm.delta_r[p][q]})")
+        
+    dot = dot.unflatten()
+    dot.render(f"graphviz/{name}.gv", view=True)
+
 def isomorphic(t1, t2, n_states):
     for bij in itertools.permutations(range(1, n_states+1)):
         bij = zip(bij, range(1, n_states+1))
@@ -309,6 +325,9 @@ def load_t(n):
 def load_m(n):
     return RewardMachine(f"./envs/grids/reward_machines/office/min/t{n}.txt")
 
+def load_c(n):
+    return RewardMachine(f"./envs/grids/reward_machines/craft/t{n}.txt")
+
 def sum_rm(language,rm1,rm2):
     n1 = len(rm1.U)
     n2 = len(rm2.U)
@@ -325,44 +344,43 @@ def sum_rm(language,rm1,rm2):
         for labels in language:
             j1, r1, _ = rm1.step(i1, labels, {})
             j = sum_state(j1,True)
-            transitions[(i,labels)]=[j,r1]
+            if (i, labels) not in transitions or transitions[(i,labels)]==[i,0.0]:
+                transitions[(i,labels)]=[j,r1]
     for i2 in range(0, n2):
         i = sum_state(i2,False)
         for labels in language:
             j2, r2, _ = rm2.step(i2, labels, {})
             j = sum_state(j2,False)
-            transitions[(i,labels)]=[j,r2]
+            if (i, labels) not in transitions or transitions[(i,labels)]==[i,0.0]:
+                transitions[(i,labels)]=[j,r2]
     return transitions
 
 def product_rm(language, rm1, rm2):
-    # language = list(filter(lambda x: len(x)>0, language)) # implicit in powerset
-    n1 = len(rm1.U)
-    n2 = len(rm2.U)
+    state_dict = dict()
+    state_dict[(0, 0)] = 0
+    state_dict[(-1,-1)] = -1
 
     def product_state(p1, p2):
-        nonlocal n1
-        nonlocal n2
-        if p1 == -1 or p2 == -1:
-            return -1
-        # if p1 == -1:
-        #     p1 = n1
-        # if p2 == -1:
-        #     p2 = n2
-        return (n2)*p1 + p2
-
-    # IPython.embed()
+        nonlocal rm1
+        nonlocal rm2
+        if (p1,p2) in state_dict:
+            return state_dict[(p1,p2)]
+        else:
+            state_dict[(p1,p2)] = len(state_dict) - 1
+            return state_dict[(p1,p2)]
 
     transitions = dict()
-    for i1 in range(0, n1):
-        for i2 in range(0, n2):
+    for i1 in itertools.chain(rm1.U, [TERMINAL_STATE]):
+        for i2 in itertools.chain(rm2.U,[TERMINAL_STATE]):
             i = product_state(i1,i2)
             for labels in language: # TODO doesn't work for labels with multiple events
-                j1, r1, _ = rm1.step(i1, labels, {})
-                j2, r2, _ = rm2.step(i2, labels, {})
+                j1, r1, _ = rm1.step(i1, labels, {}) if i1 != TERMINAL_STATE else (TERMINAL_STATE,0,None)
+                j2, r2, _ = rm2.step(i2, labels, {}) if i2 != TERMINAL_STATE else (TERMINAL_STATE,0,None)
                 j = product_state(j1,j2)
-                transitions[(i,labels)] = [j,r1+r2]
-    
-    # IPython.embed()
+                r = max(r1,r2) if j == TERMINAL_STATE else 0
+                transitions[(i,labels)] = [j,r]
+
+    # return transitions
 
     visited = set()
     to_visit= [-1,0]
@@ -370,8 +388,7 @@ def product_rm(language, rm1, rm2):
     while to_visit:
         c = to_visit.pop()
         visited.add(c)
-        ns = reachable(c, transitions)
-        for n in ns:
+        for n in reachable(c, transitions):
             if n not in visited:
                 to_visit.append(n)
 
@@ -393,6 +410,4 @@ def product_rm(language, rm1, rm2):
             q2 = add_state(q)
             result[(p2, a)] = [q2,r]
     
-    # IPython.embed()
-
     return result
