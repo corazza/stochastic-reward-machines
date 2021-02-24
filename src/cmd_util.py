@@ -135,4 +135,5 @@ def common_arg_parser():
     parser.add_argument("--rm_hidden", help="Hide RM observations", action="store_true", default=False)
     parser.add_argument('--profile_whole', help='Profile whole call to train', type=str, default=None)
     parser.add_argument('--rm_id', help="Use this RM", type=int, default=0)
+    parser.add_argument('--jirp_crm', help="DeepQ&JIRP CRM", type=bool, default=True)
     return parser

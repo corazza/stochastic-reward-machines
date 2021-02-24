@@ -156,18 +156,6 @@ def learn(env,
     rm = rm_from_transitions(t, empty_transition)
     IPython.embed()
 
-    # rm = rms[0]
-    # t=None
-    # for i in range(1, len(rms)):
-    #     t=product_rm(language, rm, rms[i])
-    #     rm = rm_from_transitions(t, empty_transition)
-    # # IPython.embed()
-    # for i in range(8, 20):
-    #     t2=smt_approx(0.4,language,i,rm)
-    #     if t2 is not None:
-    #         break
-    # IPython.embed()
-
     while step < total_timesteps:
         s = tuple(env.reset())
         true_props = env.get_events()
@@ -182,10 +170,6 @@ def learn(env,
             # Selecting and executing the action
             a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
             sn, r, done, info = env.step(a)
-
-            # if random.random() <= NOISE_PROB and r == 1:
-            #     direction = 1.0 if random.random() <= 0.5 else 1.0
-            #     r += NOISE * direction
 
             sn = tuple(sn)
             true_props = env.get_events()

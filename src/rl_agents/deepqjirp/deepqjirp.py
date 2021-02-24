@@ -20,6 +20,8 @@ from baselines.deepq.utils import ObservationInput
 from baselines.common.tf_util import get_session
 from baselines.deepq.models import build_q_func
 
+from rl_agents.deepqjirp.util import *
+
 
 class ActWrapper(object):
     def __init__(self, act, act_params):
@@ -96,7 +98,7 @@ def load_act(path):
 def learn(env,
           network,
           seed=None,
-          use_crm=False,
+          use_crm=False, # ignored
           use_rs=False,
           lr=5e-4,
           total_timesteps=100000,
@@ -134,7 +136,7 @@ def learn(env,
     seed: int or None
         prng seed. The runs with the same seed "should" give the same results. If None, no seeding is used.
     use_crm: bool
-        use counterfactual experience to train the policy
+        use counterfactual experience to train the policy (ignored)
     use_rs: bool
         use reward shaping
     lr: float
@@ -192,12 +194,13 @@ def learn(env,
         See header of baselines/deepq/categorical.py for details on the act function.
     """
 
+    assert not use_crm
+
     # Adjusting hyper-parameters by considering the number of RM states for crm
     if use_crm:
         rm_states   = env.get_num_rm_states()
         buffer_size = rm_states*buffer_size
         batch_size  = rm_states*batch_size
-
 
     # Create all the functions necessary to train the model
 
@@ -256,6 +259,18 @@ def learn(env,
     obs = env.reset()
     reset = True
 
+    # JIRP
+    X = set()
+    X_new = set()
+    X_tl = set()
+    labels = []
+    rewards = []
+    
+    agent_unique = [[478, 478, 478], [478, 478, 478], [344, 344, 344], [478, 478, 478]]
+    detected_objects = []
+
+    IPython.embed()
+
     with tempfile.TemporaryDirectory() as td:
         td = checkpoint_path or td
 
@@ -269,7 +284,6 @@ def learn(env,
         elif load_path is not None:
             load_variables(load_path)
             logger.log('Loaded model from {}'.format(load_path))
-
 
         for t in range(total_timesteps):
             if callback is not None:
