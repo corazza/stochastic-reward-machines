@@ -1,19 +1,15 @@
-import numpy as np
+def process_frame(frame, shape=(84, 84)):
+    """Preprocesses a 210x160x3 frame to 84x84x1 grayscale
+    Arguments:
+        frame: The frame to process.  Must have values ranging from 0-255
+    Returns:
+        The processed frame
+    """
+    frame = frame.astype(np.uint8)
 
-# see https://github.com/grockious/deepsynth/blob/main/training.py
-def check(a, b, upper_left):
-    ul_row = upper_left[0]
-    ul_col = upper_left[1]
-    b_rows, b_cols = b.shape
-    a_slice = a[ul_row: ul_row + b_rows, :][:, ul_col: ul_col + b_cols]
-    if a_slice.shape != b.shape:
-        return False
-    return (a_slice == b).all()
+    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+    frame = frame[34:34 + 160, :160] 
+    frame = cv2.resize(frame, shape, interpolation=cv2.INTER_NEAREST)
+    frame = frame.reshape((*shape, 1))
 
-def subarray_detector(big_array, small_array):
-    upper_left = np.argwhere(big_array == small_array[0, 0])
-    for ul in upper_left:
-        if check(big_array, small_array, ul):
-            return True
-    else:
-        return False
+    return frame

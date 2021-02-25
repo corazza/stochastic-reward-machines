@@ -3,6 +3,7 @@ import tempfile
 import IPython
 
 import tensorflow as tf
+import gym
 import zipfile
 import cloudpickle
 import numpy as np
@@ -21,7 +22,9 @@ from baselines.common.tf_util import get_session
 from baselines.deepq.models import build_q_func
 
 from rl_agents.deepqjirp.util import *
-
+from rl_agents.jirp.util import *
+from rl_agents.jirp.consts import *
+from rl_agents.jirp.jirp import consistent_hyp
 
 class ActWrapper(object):
     def __init__(self, act, act_params):
@@ -194,7 +197,7 @@ def learn(env,
         See header of baselines/deepq/categorical.py for details on the act function.
     """
 
-    assert not use_crm
+    # assert not use_crm
 
     # Adjusting hyper-parameters by considering the number of RM states for crm
     if use_crm:
@@ -213,6 +216,10 @@ def learn(env,
     # by cloudpickle when serializing make_obs_ph
 
     observation_space = env.observation_space
+    # assuming montezuma's
+    # observation_space = gym.spaces.Box(low=0, high=255, shape=(84,84), dtype='uint8')
+
+
     def make_obs_ph(name):
         return ObservationInput(observation_space, name=name)
 
@@ -257,19 +264,20 @@ def learn(env,
     episode_rewards = [0.0]
     saved_mean_reward = None
     obs = env.reset()
+    # obs = process_frame(obs)
     reset = True
 
     # JIRP
     X = set()
     X_new = set()
     X_tl = set()
-    labels = []
-    rewards = []
-    
-    agent_unique = [[478, 478, 478], [478, 478, 478], [344, 344, 344], [478, 478, 478]]
-    detected_objects = []
+    jirp_labels = []
+    jirp_rewards = []
 
-    IPython.embed()
+    transitions, n_states_last = consistent_hyp(set(), set())
+    language = sample_language(X)
+    empty_transition = dnf_for_empty(language)
+    H = rm_from_transitions(transitions, empty_transition)    
 
     with tempfile.TemporaryDirectory() as td:
         td = checkpoint_path or td
@@ -325,11 +333,25 @@ def learn(env,
             
             obs = new_obs
 
+            jirp_labels.append(detected_in_frame(obs))
+            jirp_rewards.append(rew)
+
+            # if rew > 0:
+            IPython.embed()
+
+            # if detected_in_frame(obs) != '':
+            #     IPython.embed()
+            # else:
+            #     print("nothing detected")
+
             episode_rewards[-1] += rew
             if done:
                 obs = env.reset()
                 episode_rewards.append(0.0)
                 reset = True
+
+                if not run_eqv2(3*EXACT_EPSILON, rm_run(jirp_labels,H), jirp_rewards):
+                    IPython.embed()
 
             if t > learning_starts and t % train_freq == 0:
                 # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
@@ -356,7 +378,6 @@ def learn(env,
                 logger.record_tabular("mean 100 episode reward", mean_100ep_reward)
                 logger.record_tabular("% time spent exploring", int(100 * exploration.value(t)))
                 logger.dump_tabular()
-                IPython.embed()
 
             if (checkpoint_freq is not None and t > learning_starts and
                     num_episodes > 100 and t % checkpoint_freq == 0):

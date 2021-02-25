@@ -20,7 +20,9 @@ from baselines.common import retro_wrappers
 from baselines.common.wrappers import ClipActionsWrapper
 from baselines.common.cmd_util import arg_parser
 
-from reward_machines.rm_environment import RewardMachineWrapper, HierarchicalRMWrapper, RewardMachineHidden
+from reward_machines.rm_environment import RewardMachineEnv, RewardMachineWrapper, HierarchicalRMWrapper, RewardMachineHidden
+
+from rl_agents.jirp.atari import AtariDetectionEnv
 
 def make_vec_env(env_id, env_type, num_env, seed, args, 
                  wrapper_kwargs=None,
@@ -79,6 +81,10 @@ def make_env(env_id, env_type, args, mpi_rank=0, subrank=0, seed=None, reward_sc
     # Adding RM wrappers if needed
     if args.alg.endswith("hrm") or args.alg.endswith("dhrm"):
         env = HierarchicalRMWrapper(env, args.r_min, args.r_max, args.use_self_loops)
+
+    if env_type == 'atari':
+        env = AtariDetectionEnv(env)
+        env = RewardMachineEnv(env, ["./envs/grids/reward_machines/atari/montezuma.txt"])
 
     if args.use_rs or args.use_crm:
         assert not args.rm_hidden
