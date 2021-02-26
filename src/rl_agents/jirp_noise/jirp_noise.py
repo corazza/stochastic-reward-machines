@@ -11,11 +11,14 @@ from baselines import logger
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 from rl_agents.jirp.util import *
+from rl_agents.jirp_noise.util import *
 from rl_agents.jirp.consts import *
+from rl_agents.jirp_noise.consts import *
 from rl_agents.jirp.test import *
 from rl_agents.jirp.mip_approx import mip_approx
 from rl_agents.jirp.smt_approx import smt_approx
 from rl_agents.jirp.smt_hyp import smt_hyp
+from rl_agents.jirp_noise.smt_noise import smt_noise
 from rl_agents.jirp.mip_hyp import mip_hyp
 from rl_agents.jirp.sat_hyp import sat_hyp
 
@@ -41,7 +44,7 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
         if report:
             print(f"finding model with {n_states} states")
         # print("(SMT)")
-        new_transitions = sat_hyp(0.15, X, X_tl, n_states)
+        new_transitions = smt_noise(0.15, X, X_tl, n_states)
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
         if new_transitions is not None:
@@ -83,7 +86,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         output1 = rm_run(labels, H1)
         output2 = rm_run(labels, H2)
-        if run_eqv2(MINIMIZATION_EPSILON, output1, output2):
+        if run_eqv_noise(NOISE_EPSILON+0.001, output1, output2):
             eqv += 1
         # if rm_run(labels, H1) == rm_run(labels, H2):
         #     eqv += 1
@@ -171,6 +174,9 @@ def learn(env,
             a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
             sn, r, done, info = env.step(a)
 
+            if r > 0:
+                r += random.uniform(-NOISE_EPSILON, NOISE_EPSILON)
+
             sn = tuple(sn)
             true_props = env.get_events()
             labels.append(true_props) # L(s, a, s')
@@ -197,11 +203,11 @@ def learn(env,
             else:
                 next_random = True
 
-            if len(X_new) > 50:
-                language = sample_language(X_new)
-                rm = env.current_rm
-                t_rm = rm_to_transitions(rm)
-                IPython.embed()
+            # if len(X_new) > 50:
+            #     language = sample_language(X_new)
+            #     rm = env.current_rm
+            #     t_rm = rm_to_transitions(rm)
+                # IPython.embed()
 
             # moving to the next state
             reward_total += r
@@ -221,7 +227,7 @@ def learn(env,
                 num_episodes += 1
                 total_episodes += 1
 
-                if not run_eqv2(MINIMIZATION_EPSILON, rm_run(labels, H), rewards):
+                if not run_eqv_noise(NOISE_EPSILON+0.001, rm_run(labels, H), rewards):
                     X_new.add((tuple(labels), tuple(rewards)))
                     if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
                         tl = info["TimeLimit.truncated"]

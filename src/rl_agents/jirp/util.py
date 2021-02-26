@@ -23,31 +23,10 @@ def rm_run(labels, H):
             break
     return rewards
 
-def run_eqv(output1, output2):
-    return output1 == output2
-
-def run_approx_eqv(output1, output2):
+def run_eqv(epsilon, output1, output2):
     """
-    Returns True if outputs are approximately equivalent
+    Returns True if the accumulating error of the outputs is less than epsilon
     """
-    if len(output1) != len(output2):
-        return False
-    for i in range(0, len(output1)):
-        if abs(output1[i] - output2[i]) > 3*EXACT_EPSILON:
-            return False
-    return True
-
-def run_sum_approx_eqv(output1, output2):
-    """
-    Returns True if output sums are approximately equivalent
-    """
-    if len(output1) != len(output2):
-        return False
-    sum1 = sum(output1)
-    sum2 = sum(output2)
-    return abs(sum1 - sum2) <= 3*EXACT_EPSILON
-
-def run_eqv2(epsilon, output1, output2):
     if len(output1) != len(output2):
         return False
     sum1 = 0

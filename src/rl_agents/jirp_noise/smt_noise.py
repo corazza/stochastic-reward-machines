@@ -6,13 +6,13 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 
 
-def smt_hyp(epsilon, X, X_tl, n_states, report=True, inspect=False, display=False):
+def smt_noise(epsilon, X, X_tl, n_states, report=True, inspect=False, display=False):
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
 
     d_dict = dict()
-    o_dict = dict()
+    o_dict = dict() # represents guessed mean
     n_dict = dict()
     x_dict = dict()
     
@@ -26,10 +26,6 @@ def smt_hyp(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fals
     for p in all_states_here(n_states):
         for a in language:
             o_dict[(p, a)] = Real(f"o/{p}-{a}")
-
-    for p in all_states_here(n_states):
-        z_dict[p] = Real(f"z/{p}")
-        y_dict[p] = Real(f"y/{p}")
 
     def add_x(ls, p):
         nonlocal x_dict
@@ -87,9 +83,7 @@ def smt_hyp(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fals
             for q in all_states_here(n_states):
                 d = d_dict[(p, l, q)]
                 # HERE
-                # bool or list variable, collect all rewards
-                # maybe cleanup
-                s.add(Implies(And(x, d), y_q >= y_p + (r - o)))
+                s.add(Implies(And(x, d), And(r - o >= -epsilon, r - o <= epsilon)))
 
     # (Termination)
     if TERMINATION:
@@ -159,4 +153,3 @@ def smt_hyp(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fals
         return stransitions
     else:
         return None
-        
