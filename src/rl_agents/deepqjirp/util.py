@@ -1,3 +1,6 @@
+from gym.envs.atari.atari_env import AtariEnv
+
+
 def process_frame(frame, shape=(84, 84)):
     """Preprocesses a 210x160x3 frame to 84x84x1 grayscale
     Arguments:
@@ -13,3 +16,10 @@ def process_frame(frame, shape=(84, 84)):
     frame = frame.reshape((*shape, 1))
 
     return frame
+
+def atari_underneath(env):
+    if env is None:
+        return False
+    if isinstance(env, AtariEnv):
+        return True
+    return atari_underneath(getattr(env, 'env', None))

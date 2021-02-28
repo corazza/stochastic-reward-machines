@@ -83,7 +83,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         output1 = rm_run(labels, H1)
         output2 = rm_run(labels, H2)
-        if run_eqv2(MINIMIZATION_EPSILON, output1, output2):
+        if run_eqv(EXACT_EPSILON, output1, output2):
             eqv += 1
         # if rm_run(labels, H1) == rm_run(labels, H2):
         #     eqv += 1
@@ -221,7 +221,7 @@ def learn(env,
                 num_episodes += 1
                 total_episodes += 1
 
-                if not run_eqv2(MINIMIZATION_EPSILON, rm_run(labels, H), rewards):
+                if not run_eqv(EXACT_EPSILON, rm_run(labels, H), rewards):
                     X_new.add((tuple(labels), tuple(rewards)))
                     if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
                         tl = info["TimeLimit.truncated"]

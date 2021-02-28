@@ -14,7 +14,10 @@ Notes:
 import gym
 from gym import spaces
 import numpy as np
+import IPython
+
 from reward_machines.reward_machine import RewardMachine
+from rl_agents.deepqjirp.util import atari_underneath
 
 
 class RewardMachineEnv(gym.Wrapper):
@@ -36,6 +39,8 @@ class RewardMachineEnv(gym.Wrapper):
         """
         super().__init__(env)
 
+        self.is_atari = atari_underneath(env)
+
         # Loading the reward machines
         self.rm_files = rm_files
         self.reward_machines = []
@@ -46,24 +51,40 @@ class RewardMachineEnv(gym.Wrapper):
             self.reward_machines.append(rm)
         self.num_rms = len(self.reward_machines)
 
-        # The observation space is a dictionary including the env features and a one-hot representation of the state in the reward machine
-        self.observation_dict  = spaces.Dict({'features': env.observation_space, 'rm-state': spaces.Box(low=0, high=1, shape=(self.num_rm_states,), dtype=np.uint8)})
-        flatdim = gym.spaces.flatdim(self.observation_dict)
-        # import IPython
-        # IPython.embed()
-        # TODO FIX assumes atari (just check env type)
-        s_low  = 0 # float(env.observation_space.low[0])
-        s_high = 255 # float(env.observation_space.high[0])
-        self.observation_space = spaces.Box(low=s_low, high=s_high, shape=(flatdim,), dtype=np.uint8)
+        if self.is_atari:
+            frame_width = 160 # TODO is shape the same for all atari games?
+            # in atari environments we cannot just flatten the observation space
+            # instead RM states are embedded directly in the image, in a 20xwidth track of pixels below the game frame
+            self.observation_space = spaces.Box(low=0, high=255, shape=(210+20,frame_width,3), dtype=np.uint8)
 
-        # Computing one-hot encodings for the non-terminal RM states
-        self.rm_state_features = {}
-        for rm_id, rm in enumerate(self.reward_machines):
-            for u_id in rm.get_states():
-                u_features = np.zeros(self.num_rm_states)
-                u_features[len(self.rm_state_features)] = 1
-                self.rm_state_features[(rm_id,u_id)] = u_features
-        self.rm_done_feat = np.zeros(self.num_rm_states) # for terminal RM states, we give as features an array of zeros
+            rm_state_width = frame_width // self.num_rm_states
+
+            # Computing one-hot encodings for the non-terminal RM states
+            self.rm_state_features = {}
+            for rm_id, rm in enumerate(self.reward_machines):
+                for u_id in rm.get_states():
+                    u_features = np.zeros(shape=(20, frame_width, 3), dtype=np.uint8)
+                    hot_encoding = np.full(shape=(20,rm_state_width,3),fill_value=255,dtype=np.uint8)
+                    i = len(self.rm_state_features)
+                    u_features[0:20, rm_state_width*i:rm_state_width*(i+1)] = hot_encoding
+                    self.rm_state_features[(rm_id,u_id)] = u_features
+            self.rm_done_feat = np.zeros(shape=(20, 160, 3), dtype=np.uint8)
+        else:
+            # The observation space is a dictionary including the env features and a one-hot representation of the state in the reward machine
+            self.observation_dict  = spaces.Dict({'features': env.observation_space, 'rm-state': spaces.Box(low=0, high=1, shape=(self.num_rm_states,), dtype=np.uint8)})
+            flatdim = gym.spaces.flatdim(self.observation_dict)
+            s_low  = float(env.observation_space.low[0])
+            s_high = float(env.observation_space.high[0])
+            self.observation_space = spaces.Box(low=s_low, high=s_high, shape=(flatdim,), dtype=np.float32)
+
+            # Computing one-hot encodings for the non-terminal RM states
+            self.rm_state_features = {}
+            for rm_id, rm in enumerate(self.reward_machines):
+                for u_id in rm.get_states():
+                    u_features = np.zeros(self.num_rm_states)
+                    u_features[len(self.rm_state_features)] = 1
+                    self.rm_state_features[(rm_id,u_id)] = u_features
+            self.rm_done_feat = np.zeros(self.num_rm_states) # for terminal RM states, we give as features an array of zeros
 
         # Selecting the current RM task
         self.current_rm_id = -1
@@ -101,10 +122,13 @@ class RewardMachineEnv(gym.Wrapper):
         return rm_obs, rm_rew, done, info
 
     def get_observation(self, next_obs, rm_id, u_id, done):
-        rm_feat = self.rm_done_feat if done else self.rm_state_features[(rm_id,u_id)]
-        rm_obs = {'features': next_obs,'rm-state': rm_feat}
-        return gym.spaces.flatten(self.observation_dict, rm_obs)           
-
+        if not self.is_atari:
+            rm_feat = self.rm_done_feat if done else self.rm_state_features[(rm_id,u_id)]
+            rm_obs = {'features': next_obs,'rm-state': rm_feat}
+            return gym.spaces.flatten(self.observation_dict, rm_obs)
+        else:
+            rm_feat = self.rm_done_feat if done else self.rm_state_features[(rm_id,u_id)]
+            return np.concatenate((next_obs, rm_feat))
 
 class RewardMachineHidden(gym.Wrapper):
     def __init__(self, env, gamma, rs_gamma, rm_id=None):

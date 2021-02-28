@@ -316,6 +316,9 @@ def learn(env,
             env_action = action
             reset = False
             new_obs, rew, done, info = env.step(env_action)
+            true_props = env.get_events()
+            jirp_labels.append(true_props)
+            jirp_rewards.append(rew)
 
             # Store transition in the replay buffer.
             if use_crm:
@@ -333,24 +336,13 @@ def learn(env,
             
             obs = new_obs
 
-            jirp_labels.append(detected_in_frame(obs))
-            jirp_rewards.append(rew)
-
-            # if rew > 0:
-            IPython.embed()
-
-            # if detected_in_frame(obs) != '':
-            #     IPython.embed()
-            # else:
-            #     print("nothing detected")
-
             episode_rewards[-1] += rew
             if done:
                 obs = env.reset()
                 episode_rewards.append(0.0)
                 reset = True
 
-                if not run_eqv2(3*EXACT_EPSILON, rm_run(jirp_labels,H), jirp_rewards):
+                if not run_eqv(3*EXACT_EPSILON, rm_run(jirp_labels,H), jirp_rewards):
                     IPython.embed()
 
             if t > learning_starts and t % train_freq == 0:

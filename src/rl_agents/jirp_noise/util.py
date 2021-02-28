@@ -8,3 +8,6 @@ def run_eqv_noise(epsilon, output1, output2):
         if abs(output1[i] - output2[i]) > epsilon:
             return False
     return True
+
+def make_consistent(epsilon, labels, rewards, H):
+    return None

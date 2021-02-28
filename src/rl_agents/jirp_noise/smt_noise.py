@@ -80,10 +80,11 @@ def smt_noise(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fa
         for p in all_states_here(n_states):
             x = add_x(lm, p)
             o = o_dict[(p, l)]
-            for q in all_states_here(n_states):
-                d = d_dict[(p, l, q)]
-                # HERE
-                s.add(Implies(And(x, d), And(r - o >= -epsilon, r - o <= epsilon)))
+            s.add(Implies(x, And(r - o >= -epsilon, r - o <= epsilon)))
+            # for q in all_states_here(n_states):
+            #     d = d_dict[(p, l, q)]
+            #     # HERE
+            #     s.add(Implies(And(x, d), And(r - o >= -epsilon, r - o <= epsilon)))
 
     # (Termination)
     if TERMINATION:

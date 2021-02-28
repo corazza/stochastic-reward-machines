@@ -44,7 +44,7 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
         if report:
             print(f"finding model with {n_states} states")
         # print("(SMT)")
-        new_transitions = smt_noise(0.15, X, X_tl, n_states)
+        new_transitions = smt_noise(NOISE_EPSILON, X, X_tl, n_states)
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
         if new_transitions is not None:
@@ -174,8 +174,7 @@ def learn(env,
             a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
             sn, r, done, info = env.step(a)
 
-            if r > 0:
-                r += random.uniform(-NOISE_EPSILON, NOISE_EPSILON)
+            r += random.uniform(-NOISE_EPSILON, NOISE_EPSILON)
 
             sn = tuple(sn)
             true_props = env.get_events()
@@ -228,11 +227,15 @@ def learn(env,
                 total_episodes += 1
 
                 if not run_eqv_noise(NOISE_EPSILON+0.001, rm_run(labels, H), rewards):
-                    X_new.add((tuple(labels), tuple(rewards)))
-                    if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
-                        tl = info["TimeLimit.truncated"]
-                        if tl:
-                            X_tl.add((tuple(labels), tuple(rewards)))
+                    fixed = make_consistent(NOISE_EPSILON+0.001, labels, rewards, H)
+                    if fixed is not None:
+                        H = fixed
+                    else:
+                        X_new.add((tuple(labels), tuple(rewards)))
+                        if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
+                            tl = info["TimeLimit.truncated"]
+                            if tl:
+                                X_tl.add((tuple(labels), tuple(rewards)))
 
                 if num_episodes % UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
                     print(f"len(X)={len(X)}")

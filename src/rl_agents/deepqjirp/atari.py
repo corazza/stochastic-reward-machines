@@ -58,3 +58,4 @@ class AtariDetectionEnv(gym.Wrapper):
 
     def get_events(self):
         return self.detected_objects
+        

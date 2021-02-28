@@ -1,1 +1,1 @@
-NOISE_EPSILON = 0.15 # uniform around outputs, known
+NOISE_EPSILON = 0.6 # uniform around outputs, known
