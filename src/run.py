@@ -164,6 +164,8 @@ def get_alg_module(alg, submodule=None):
         alg_module = import_module('.'.join([library, alg, submodule]))
     except ImportError:
         # then from rl_algs
+        import IPython
+        IPython.embed()
         alg_module = import_module('.'.join(['baselines', alg, submodule]))
 
     return alg_module

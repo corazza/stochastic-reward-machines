@@ -1,6 +1,7 @@
 import os
 import tempfile
 import IPython
+import tracemalloc
 
 import tensorflow as tf
 import gym
@@ -197,7 +198,7 @@ def learn(env,
         See header of baselines/deepq/categorical.py for details on the act function.
     """
 
-    # assert not use_crm
+    tracemalloc.start()
 
     # Adjusting hyper-parameters by considering the number of RM states for crm
     if use_crm:
@@ -317,8 +318,8 @@ def learn(env,
             reset = False
             new_obs, rew, done, info = env.step(env_action)
             true_props = env.get_events()
-            jirp_labels.append(true_props)
-            jirp_rewards.append(rew)
+            # jirp_labels.append(true_props)
+            # jirp_rewards.append(rew)
 
             # Store transition in the replay buffer.
             if use_crm:
@@ -342,8 +343,8 @@ def learn(env,
                 episode_rewards.append(0.0)
                 reset = True
 
-                if not run_eqv(3*EXACT_EPSILON, rm_run(jirp_labels,H), jirp_rewards):
-                    IPython.embed()
+                # if not run_eqv(3*EXACT_EPSILON, rm_run(jirp_labels,H), jirp_rewards):
+                #     IPython.embed()
 
             if t > learning_starts and t % train_freq == 0:
                 # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
@@ -370,6 +371,8 @@ def learn(env,
                 logger.record_tabular("mean 100 episode reward", mean_100ep_reward)
                 logger.record_tabular("% time spent exploring", int(100 * exploration.value(t)))
                 logger.dump_tabular()
+                snapshot = tracemalloc.take_snapshot()
+                display_top(snapshot)
 
             if (checkpoint_freq is not None and t > learning_starts and
                     num_episodes > 100 and t % checkpoint_freq == 0):

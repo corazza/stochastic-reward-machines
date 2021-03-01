@@ -128,7 +128,8 @@ class RewardMachineEnv(gym.Wrapper):
             return gym.spaces.flatten(self.observation_dict, rm_obs)
         else:
             rm_feat = self.rm_done_feat if done else self.rm_state_features[(rm_id,u_id)]
-            return np.concatenate((next_obs, rm_feat))
+            res = np.concatenate((np.copy(next_obs), np.zeros(rm_feat.shape)))
+            return res
 
 class RewardMachineHidden(gym.Wrapper):
     def __init__(self, env, gamma, rs_gamma, rm_id=None):
