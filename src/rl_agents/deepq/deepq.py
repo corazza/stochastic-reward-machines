@@ -203,7 +203,7 @@ def learn(env,
     sess = get_session()
     set_global_seeds(seed)
 
-    network = 'mlp'
+    # network = 'mlp'
 
     q_func = build_q_func(network, **network_kwargs)
 

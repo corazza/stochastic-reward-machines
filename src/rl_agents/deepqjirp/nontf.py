@@ -207,7 +207,6 @@ def learn(env,
         buffer_size = rm_states*buffer_size
         batch_size  = rm_states*batch_size
 
-    sess = get_session()
     set_global_seeds(seed)
 
     # capture the shape outside the closure so that the env object is not serialized
@@ -222,38 +221,15 @@ def learn(env,
     def make_obs_ph(name):
         return ObservationInput(observation_space, name=name)
 
-    q_func = dict()
-    act = dict()
-    train = dict()
-    update_target = dict()
-    debug = dict()
+    main_dqn = dict()
+    target_dqn = dict()
     replay_buffer = dict()
     beta_schedule = dict()
-    act_params = dict()
     exploration = dict()
 
     for p in env.current_rm.U: # TODO currently assumes single RM
-        scope = f"deepq_state_{p}"
-        q_func[p] = build_q_func(network, **network_kwargs)
-
-        act[p], train[p], update_target[p], debug[p] = deepq.build_train(
-            make_obs_ph=make_obs_ph,
-            q_func=q_func[p],
-            num_actions=env.action_space.n,
-            optimizer=tf.train.AdamOptimizer(learning_rate=lr),
-            gamma=gamma,
-            grad_norm_clipping=10,
-            param_noise=param_noise,
-            scope=scope
-        )
-
-        act_params[p] = {
-            'make_obs_ph': make_obs_ph,
-            'q_func': q_func[p],
-            'num_actions': env.action_space.n,
-        }
-
-        act[p] = ActWrapper(act[p], act_params[p])
+        main_dqn[p] = build_q_network(n_actions=env.action_space.n, learning_rate=lr)
+        target_dqn[p] = build_q_network(n_actions=env.action_space.n, learning_rate=lr)
 
         # Create the replay buffer
         if prioritized_replay:
@@ -267,16 +243,9 @@ def learn(env,
             replay_buffer[p] = ReplayBuffer(buffer_size)
             beta_schedule[p] = None
 
-    # Create the schedule for exploration starting from 1.
     exploration = LinearSchedule(schedule_timesteps=int(exploration_fraction * total_timesteps),
-                                    initial_p=1.0,
-                                    final_p=exploration_final_eps)
-
-
-    U.initialize()
-
-    for p in env.current_rm.U:
-        update_target[p]()
+                                initial_p=1.0,
+                                final_p=exploration_final_eps)
 
     episode_rewards = [0.0]
     saved_mean_reward = None
@@ -328,6 +297,7 @@ def learn(env,
                 kwargs['reset'] = reset
                 kwargs['update_param_noise_threshold'] = update_param_noise_threshold
                 kwargs['update_param_noise_scale'] = True
+
             action = act[rm_state](np.array(obs)[None], update_eps=update_eps, **kwargs)[0]
 
             env_action = action
@@ -353,7 +323,8 @@ def learn(env,
             # Adding the experiences to the replay buffer
             for _obs, _action, _r, _new_obs, _done in experiences:
                 p = _obs['rm-state']
-                replay_buffer[p].add(_obs['features'], _action, _r, _new_obs, _done)
+                with sess[p].as_default():
+                    replay_buffer[p].add(_obs['features'], _action, _r, _new_obs, _done)
             
             obs = new_obs
             rm_state = new_rm_state
@@ -371,22 +342,24 @@ def learn(env,
 
             if t > learning_starts and t % train_freq == 0:
                 for p in env.current_rm.U:
-                    # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
-                    if prioritized_replay:
-                        experience = replay_buffer[p].sample(batch_size, beta=beta_schedule[p].value(t))
-                        (obses_t, actions, rewards, obses_tp1, dones, weights, batch_idxes) = experience
-                    else:
-                        obses_t, actions, rewards, obses_tp1, dones = replay_buffer[p].sample(batch_size)
-                        weights, batch_idxes = np.ones_like(rewards), None
-                    td_errors = train[p](obses_t, actions, rewards, obses_tp1, dones, weights)
-                    if prioritized_replay:
-                        new_priorities = np.abs(td_errors) + prioritized_replay_eps
-                        replay_buffer[p].update_priorities(batch_idxes, new_priorities)
+                    with sess[p].as_default():
+                        # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
+                        if prioritized_replay:
+                            experience = replay_buffer[p].sample(batch_size, beta=beta_schedule[p].value(t))
+                            (obses_t, actions, rewards, obses_tp1, dones, weights, batch_idxes) = experience
+                        else:
+                            obses_t, actions, rewards, obses_tp1, dones = replay_buffer[p].sample(batch_size)
+                            weights, batch_idxes = np.ones_like(rewards), None
+                        td_errors = train[p](obses_t, actions, rewards, obses_tp1, dones, weights)
+                        if prioritized_replay:
+                            new_priorities = np.abs(td_errors) + prioritized_replay_eps
+                            replay_buffer[p].update_priorities(batch_idxes, new_priorities)
 
             if t > learning_starts and t % target_network_update_freq == 0:
                 for p in env.current_rm.U:
-                    # Update target network periodically.
-                    update_target[p]()
+                    with sess[p].as_default():
+                        # Update target network periodically.
+                        update_target[p]()
 
             mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
             num_episodes = len(episode_rewards)
