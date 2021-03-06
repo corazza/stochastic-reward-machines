@@ -2,7 +2,7 @@ import random
 import itertools
 import os, tempfile
 from collections import defaultdict
-from graphviz import Digraph
+# from graphviz import Digraph
 import IPython
 
 from rl_agents.jirp.dnf_compile import compile_dnf, evaluate_dnf_compiled

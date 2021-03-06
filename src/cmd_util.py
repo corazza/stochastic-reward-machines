@@ -22,7 +22,7 @@ from baselines.common.cmd_util import arg_parser
 
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineWrapper, HierarchicalRMWrapper, RewardMachineHidden
 
-from rl_agents.deepqjirp.atari import AtariDetectionEnv
+from rl_agents.deepqjirp2.atari import AtariDetectionEnv
 
 def make_vec_env(env_id, env_type, num_env, seed, args, 
                  wrapper_kwargs=None,
@@ -84,14 +84,17 @@ def make_env(env_id, env_type, args, mpi_rank=0, subrank=0, seed=None, reward_sc
 
     if env_type == 'atari':
         env = AtariDetectionEnv(env)
-        env = RewardMachineEnv(env, ["./envs/grids/reward_machines/atari/montezuma.txt"])
+        if not args.no_rm:
+            env = RewardMachineEnv(env, ["./envs/grids/reward_machines/atari/montezuma.txt"])
 
     if args.use_rs or args.use_crm:
         assert not args.rm_hidden
+        assert not args.no_rm
         env = RewardMachineWrapper(env, args.use_crm, args.use_rs, args.gamma, args.rs_gamma)
 
     if args.rm_hidden:
         assert not (args.use_rs or args.use_crm)
+        assert not args.no_rm
         env = RewardMachineHidden(env, args.gamma, args.rs_gamma, args.rm_id)
 
     if flatten_dict_observations and isinstance(env.observation_space, gym.spaces.Dict):
@@ -109,6 +112,9 @@ def make_env(env_id, env_type, args, mpi_rank=0, subrank=0, seed=None, reward_sc
         env = retro_wrappers.RewardScaler(env, reward_scale)
 
     return env
+
+# here
+# make deepqjirp not construct rm envs and instead use a normal env, maybe switch --no_rm
 
 def common_arg_parser():
     """
@@ -141,5 +147,5 @@ def common_arg_parser():
     parser.add_argument("--rm_hidden", help="Hide RM observations", action="store_true", default=False)
     parser.add_argument('--profile_whole', help='Profile whole call to train', type=str, default=None)
     parser.add_argument('--rm_id', help="Use this RM", type=int, default=0)
-    parser.add_argument('--jirp_crm', help="DeepQ&JIRP CRM", type=bool, default=True)
+    parser.add_argument('--no_rm', help="DeepQ/JIRP runs on envs without an explicit underlying RM", action="store_true", default=False)
     return parser

@@ -17,7 +17,7 @@ import numpy as np
 import IPython
 
 from reward_machines.reward_machine import RewardMachine
-from rl_agents.deepqjirp.util import atari_underneath
+from rl_agents.deepqjirp2.util import atari_underneath
 
 
 class RewardMachineEnv(gym.Wrapper):
@@ -125,7 +125,7 @@ class RewardMachineEnv(gym.Wrapper):
             rm_feat = self.rm_done_feat if done else self.rm_state_features[(rm_id,u_id)]
             rm_obs = {'features': next_obs,'rm-state': rm_feat}
             return gym.spaces.flatten(self.observation_dict, rm_obs)
-        else:
+        else: # TODO should be done differently, respect .observation_space
             return {'features': next_obs, 'rm-id': rm_id, 'rm-state': u_id}
             # rm_feat = self.rm_done_feat if done else self.rm_state_features[(rm_id,u_id)]
             # res = np.concatenate((np.copy(next_obs), np.zeros(rm_feat.shape)))

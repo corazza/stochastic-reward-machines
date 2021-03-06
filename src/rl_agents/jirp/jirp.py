@@ -34,8 +34,7 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
     if len(X) == 0:
         transitions = dict()
         transitions[(0, tuple())] = [0, 0.0]
-        transitions[(1, tuple())] = [0, 0.0]
-        return transitions, 2
+        return transitions, 1
     # TODO intercept empty X here
     for n_states in range(n_states_start, MAX_RM_STATES_N+1):
         if report:
@@ -47,7 +46,7 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
         if new_transitions is not None:
             # if new_transitions_sat is None:
             #     print(f"SAT couldn't find anything with n_states={n_states}")
-            display_transitions(new_transitions, "st")
+            # display_transitions(new_transitions, "st")
             return new_transitions, n_states
         continue
 
@@ -125,8 +124,7 @@ def learn(env,
           use_rs=False):
     assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
 
-    # test2(env.current_rm)
-    # exit()
+    IPython.embed()
 
     reward_total = 0
     total_episodes = 0
@@ -197,12 +195,6 @@ def learn(env,
             else:
                 next_random = True
 
-            if len(X_new) > 50:
-                language = sample_language(X_new)
-                rm = env.current_rm
-                t_rm = rm_to_transitions(rm)
-                IPython.embed()
-
             # moving to the next state
             reward_total += r
             rewards.append(r)
@@ -237,8 +229,8 @@ def learn(env,
                     empty_transition = dnf_for_empty(language)
                     transitions_new, n_states_last = consistent_hyp(X, X_tl, n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
+                    Q = transfer_Q(H_new, H, Q, X)
                     H = H_new
                     transitions = transitions_new
-                    Q = transfer_Q(H_new, H, Q, X)
                 break
             s = sn
