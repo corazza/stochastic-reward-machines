@@ -126,6 +126,12 @@ class OfficeRM3Env(GridRMEnv):
         env = OfficeWorld()
         super().__init__(GridEnv(env),rm_files)
 
+class OfficeNoisyRM3Env(GridRMEnv):
+    def __init__(self):
+        rm_files = ["./envs/grids/reward_machines/office/t11.txt"]
+        env = OfficeWorld()
+        super().__init__(GridEnv(env),rm_files)
+
 class CraftRMEnv(GridRMEnv):
     def __init__(self, file_map):
         rm_files = ["./envs/grids/reward_machines/craft/t%d.txt"%i for i in range(1,11)]

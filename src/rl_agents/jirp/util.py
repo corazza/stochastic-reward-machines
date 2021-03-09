@@ -307,6 +307,9 @@ def load_m(n):
 def load_c(n):
     return RewardMachine(f"./envs/grids/reward_machines/craft/t{n}.txt")
 
+def load(path):
+    return RewardMachine(path)
+
 def sum_rm(language,rm1,rm2):
     n1 = len(rm1.U)
     n2 = len(rm2.U)

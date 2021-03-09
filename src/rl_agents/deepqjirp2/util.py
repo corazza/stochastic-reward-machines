@@ -39,19 +39,64 @@ def atari_underneath(env):
         return True
     return atari_underneath(getattr(env, 'env', None))
 
-# HERE
-# render tabular environments into images, feed into dqns
-# 
-
-def initial_Q_nets(H, env):
+def initial_Q_nets_counters(H, env):
     Q = dict()
+    C = dict()
     for v in H.get_states():
         main_dqn = build_q_network(n_actions=env.action_space.n, learning_rate=LEARNING_RATE)
         target_dqn = build_q_network(n_actions=env.action_space.n, learning_rate=LEARNING_RATE)
         replay_buffer = ReplayBuffer(size=MEM_SIZE, input_shape=INPUT_SHAPE, use_per=USE_PER)
         Q[v] = Agent(main_dqn, target_dqn, replay_buffer, env.action_space.n,
                        input_shape=INPUT_SHAPE, batch_size=BATCH_SIZE, use_per=USE_PER)
-    return Q
+        C[v] = 0
+    return Q, C 
+
+def clean_trace_montezuma(labels, rewards):
+    labels_new = list()
+    rewards_new = list()
+    last = None
+    for i in range(0, len(labels)):
+        if labels[i] == last:
+            continue
+        labels_new.append(labels[i])
+        rewards_new.append(rewards[i])
+        last = labels[i]
+    return ((tuple(labels_new), tuple(rewards_new)))
+
+def automaton_reward(current_agent, new_obj_set_in, old_obj_set_in):
+    new_detected_obj = list(set(new_obj_set_in) - set(old_obj_set_in))
+    if current_agent == '':
+        if len(new_obj_set_in) > len(old_obj_set_in):
+            return 1
+        else:
+            return 0
+    elif current_agent == 'l':
+        if 'l' not in new_detected_obj and new_detected_obj != []:
+            return 1
+        else:
+            return 0
+    elif current_agent == 'r':
+        if 'r' not in new_detected_obj and new_detected_obj != [] and \
+                'l' not in new_detected_obj:
+            return 1
+        else:
+            return 0
+    elif current_agent == 'm':
+        if 'm' not in new_detected_obj and new_detected_obj != []:
+            return 1
+        else:
+            return 0
+    elif current_agent == 'n':
+        if 'n' not in new_detected_obj and new_detected_obj != []:
+            return 1
+        else:
+            return 0
+    elif current_agent == 'k':
+        if 'k' not in new_detected_obj and new_detected_obj != []:
+            return 1
+        else:
+            return 0
+    return 0 # e.g. 'o'
 
 def build_q_network(n_actions, learning_rate=0.00001, input_shape=(84, 84), history_length=4):
     """Builds a dueling DQN as a Keras model
@@ -405,7 +450,10 @@ class Agent(object):
         for i in range(0, len(new_states)):
             next_p = next_rm_states[i][-1]
             next_state = new_states[i].reshape((-1, self.input_shape[0], self.input_shape[1], self.history_length))
-            q_vals = agent_dict[next_p].DQN.predict(next_state)[0]
+            if next_p != -1:
+                q_vals = agent_dict[next_p].DQN.predict(next_state)[0]
+            else:
+                q_vals = np.zeros((18,), dtype=np.float32)
             future_q_vals.append(q_vals)
         future_q_vals = np.asarray(future_q_vals)
 

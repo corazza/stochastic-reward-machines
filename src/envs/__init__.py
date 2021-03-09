@@ -47,6 +47,12 @@ register(
     max_episode_steps=1000
 )
 
+register(
+    id='Office-noisy-v0',
+    entry_point='envs.grids.grid_environment:OfficeNoisyRM3Env',
+    max_episode_steps=1000
+)
+
 # ----------------------------------------- CRAFT
 for i in range(11):
     w_id = 'Craft-M%d-v0'%i

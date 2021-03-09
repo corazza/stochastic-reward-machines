@@ -26,7 +26,7 @@ from rl_agents.jirp.sat_hyp import sat_hyp
 last_displayed_states = 0
 
 # @profile(sort="tottime")
-def consistent_hyp(X, X_tl, n_states_start=2, report=True):
+def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
     and its number of states
@@ -37,20 +37,19 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
     if len(X) == 0:
         transitions = dict()
         transitions[(0, tuple())] = [0, 0.0]
-        transitions[(1, tuple())] = [0, 0.0]
         return transitions, 2
     # TODO intercept empty X here
     for n_states in range(n_states_start, MAX_RM_STATES_N+1):
         if report:
             print(f"finding model with {n_states} states")
         # print("(SMT)")
-        new_transitions = smt_noise(NOISE_EPSILON, X, X_tl, n_states)
+        new_transitions = smt_noise(noise_epsilon, X, X_tl, n_states)
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
         if new_transitions is not None:
             # if new_transitions_sat is None:
             #     print(f"SAT couldn't find anything with n_states={n_states}")
-            display_transitions(new_transitions, "st")
+            # display_transitions(new_transitions, "st")
             return new_transitions, n_states
         continue
 
@@ -75,7 +74,7 @@ def approximate_hyp(approximation_method, language, transitions, n_states):
         last_displayed_states = n_states
     return approximation_method(EXACT_EPSILON, language, n_states, n_states, transitions, empty_transition, report=True, display=True), n_states
 
-def equivalent_on_X(H1, v1, H2, v2, X):
+def equivalent_on_X(noise_epsilon, H1, v1, H2, v2, X):
     """
     Checks if state v1 from RM H1 is equivalent to v2 from H2
     """
@@ -86,7 +85,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         output1 = rm_run(labels, H1)
         output2 = rm_run(labels, H2)
-        if run_eqv_noise(NOISE_EPSILON+0.001, output1, output2):
+        if run_eqv_noise(noise_epsilon+0.001, output1, output2):
             eqv += 1
         # if rm_run(labels, H1) == rm_run(labels, H2):
         #     eqv += 1
@@ -95,7 +94,7 @@ def equivalent_on_X(H1, v1, H2, v2, X):
         return True
     return False
 
-def transfer_Q(H_new, H_old, Q_old, X = {}):
+def transfer_Q(noise_epsilon, H_new, H_old, Q_old, X = {}):
     """
     Returns new set of q-functions, indexed by states of H_new, where
     some of the q-functions may have been transfered from H_old if the
@@ -110,7 +109,7 @@ def transfer_Q(H_new, H_old, Q_old, X = {}):
         Q[v] = dict()
         # find probably equivalent state u in H_old
         for u in H_old.get_states():
-            if equivalent_on_X(H_new, v, H_old, u, X) and u in Q_old:
+            if equivalent_on_X(noise_epsilon, H_new, v, H_old, u, X) and u in Q_old:
                 Q[v] = copy.deepcopy(Q_old[u])
                 break
     return Q
@@ -130,6 +129,7 @@ def learn(env,
 
     # test2(env.current_rm)
     # exit()
+    noise_epsilon = env.current_rm.epsilon_cont
 
     reward_total = 0
     total_episodes = 0
@@ -137,27 +137,18 @@ def learn(env,
     num_episodes = 0
 
     X = set()
+    T = set()
     X_new = set()
     X_tl = set()
     labels = []
     rewards = []
 
-    transitions, n_states_last = consistent_hyp(set(), set())
+    transitions, n_states_last = consistent_hyp(noise_epsilon, set(), set())
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     H = rm_from_transitions(transitions, empty_transition)
-
     actions = list(range(env.action_space.n))
     Q = initial_Q(H)
-
-    # rms = [load_c(i) for i in range(1, 11)]
-    # language={"","a", "b","f", "c","e", "d"}
-    # empty_transition=dnf_for_empty(language)
-    # rm1 = load_c(3)
-    # rm2 = load_c(8)
-    # t = product_rm(language, rm1, rm2)
-    # rm = rm_from_transitions(t, empty_transition)
-    # IPython.embed()
 
     while step < total_timesteps:
         s = tuple(env.reset())
@@ -173,8 +164,6 @@ def learn(env,
             # Selecting and executing the action
             a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
             sn, r, done, info = env.step(a)
-
-            r += random.uniform(-NOISE_EPSILON, NOISE_EPSILON)
 
             sn = tuple(sn)
             true_props = env.get_events()
@@ -198,17 +187,10 @@ def learn(env,
                 Q[v][s][a] += lr*_delta
 
             if not rm_done or not TERMINATION:
-                rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
+                rm_state = next_rm_state
             else:
                 next_random = True
 
-            # if len(X_new) > 50:
-            #     language = sample_language(X_new)
-            #     rm = env.current_rm
-            #     t_rm = rm_to_transitions(rm)
-                # IPython.embed()
-
-            # moving to the next state
             reward_total += r
             rewards.append(r)
             step += 1
@@ -225,29 +207,37 @@ def learn(env,
             if done:
                 num_episodes += 1
                 total_episodes += 1
-
-                if not run_eqv_noise(NOISE_EPSILON+0.001, rm_run(labels, H), rewards):
-                    fixed = make_consistent(NOISE_EPSILON+0.001, labels, rewards, H)
-                    if fixed is not None:
-                        H = fixed
-                    else:
-                        X_new.add((tuple(labels), tuple(rewards)))
-                        if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
-                            tl = info["TimeLimit.truncated"]
-                            if tl:
-                                X_tl.add((tuple(labels), tuple(rewards)))
+                if not run_eqv_noise(noise_epsilon+0.00001, rm_run(labels, H), rewards):
+                    T.add((tuple(labels), tuple(rewards)))
+                    X_new.add((tuple(labels), tuple(rewards)))
+                    if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
+                        tl = info["TimeLimit.truncated"]
+                        if tl:
+                            X_tl.add((tuple(labels), tuple(rewards)))
 
                 if num_episodes % UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
                     X.update(X_new)
+
+                    for (labelsx, rewardsx) in X_new:
+                        fixed = make_consistent(noise_epsilon, labels, rewards, T, H)
+                        if fixed is not None:
+                            H = fixed
+                            print("AAAA")
+                            IPython.embed()
+                        else:
+                            break                        
                     X_new = set()
-                    language = sample_language(X)
-                    empty_transition = dnf_for_empty(language)
-                    transitions_new, n_states_last = consistent_hyp(X, X_tl, n_states_last)
-                    H_new = rm_from_transitions(transitions_new, empty_transition)
-                    H = H_new
-                    transitions = transitions_new
-                    Q = transfer_Q(H_new, H, Q, X)
+                    if fixed is None:
+                        language = sample_language(X)
+                        empty_transition = dnf_for_empty(language)
+                        transitions_new, n_states_last = consistent_hyp(noise_epsilon, X, X_tl, n_states_last)
+                        H_new = rm_from_transitions(transitions_new, empty_transition)
+                        H = H_new
+                        transitions = transitions_new
+                        Q = transfer_Q(noise_epsilon, H_new, H, Q, X)
+                    else:
+                        H = fixed
                 break
             s = sn

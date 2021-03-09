@@ -1,6 +1,6 @@
 from reward_machines.reward_functions import *
 from reward_machines.reward_machine_utils import value_iteration
-from rl_agents.jirp.label_reward_function import LabelRewardFunction
+from rl_agents.jirp.label_reward_function import LabelRewardFunction, NoisyContRewardFunction
 from rl_agents.jirp.dnf_compile import compile_dnf, evaluate_dnf_compiled
 
 import time
@@ -15,6 +15,7 @@ class RewardMachine:
         self.delta_u_compiled = {} # compiled dnfs
         self.delta_r    = {} # reward-transition function
         self.terminal_u = -1  # All terminal states are sent to the same terminal state with id *-1*
+        self.epsilon_cont = None # non-zero for continuous noise
         self._load_reward_machine(file)
         self.known_transitions = {} # Auxiliary variable to speed up computation of the next RM state
 
@@ -26,7 +27,7 @@ class RewardMachine:
             - gamma(float):    this is the gamma from the environment
             - rs_gamma(float): this gamma that is used in the value iteration that compute the shaping potentials
         """
-        self.gamma    = gamma
+        self.gamma = gamma
         self.potentials = value_iteration(self.U, self.delta_u, self.delta_r, self.terminal_u, rs_gamma)
         for u in self.potentials:
             self.potentials[u] = -self.potentials[u]
@@ -85,7 +86,33 @@ class RewardMachine:
         new_rm.known_transitions = {}
         return new_rm
 
+    def move_output(self, u1, true_props, to):
+        assert u1 != self.terminal_u, "the RM was set to a terminal state!"
+        u2 = self.get_next_state(u1, true_props)
+        done = (u2 == self.terminal_u)
+        self._update_mean(u1, u2, to, true_props)
+        
     # Private methods -----------------------------------
+    def _update_mean(self, u1, u2, to, true_props):
+        if u1 in self.delta_r and u2 in self.delta_r[u1]:
+            reward_function = self.delta_r[u1][u2]
+            if isinstance(reward_function, LabelRewardFunction):
+                reward_function.change_for(true_props, to)
+            reward_function.c = to
+
+    def _get_mean(self,u1,u2,s_info,add_rs,env_done):
+        """
+        Returns the reward associated to this transition.
+        """
+        # Getting reward from the RM
+        reward = 0 # NOTE: if the agent falls from the reward machine it receives reward of zero
+        if u1 in self.delta_r and u2 in self.delta_r[u1]:
+            reward_function = self.delta_r[u1][u2]
+            if not isinstance(reward_function, NoisyContRewardFunction): # or NoisyDisc...
+                reward += reward_function.get_reward(s_info)
+            else:
+                reward += reward_function.get_mean(s_info)
+        return reward
 
     def _get_reward(self,u1,u2,s_info,add_rs,env_done):
         """
@@ -102,7 +129,6 @@ class RewardMachine:
             rs = self.gamma * self.potentials[un] - self.potentials[u1]
         # Returning final reward
         return reward + rs
-
 
     def _load_reward_machine(self, file):
         """
@@ -127,6 +153,11 @@ class RewardMachine:
         for e in lines[2:]:
             # Reading the transition
             u1, u2, dnf_formula, reward_function = eval(e)
+            if isinstance(reward_function, NoisyContRewardFunction):
+                if self.epsilon_cont is None:
+                    self.epsilon_cont = reward_function.eps
+                elif self.epsilon_cont < reward_function.eps:
+                    self.epsilon_cont = reward_function.eps
             # terminal states
             if u1 in terminal_states:
                 continue
