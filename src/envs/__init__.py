@@ -71,3 +71,17 @@ for i in range(11):
         entry_point=w_en,
         max_episode_steps=1000
     )
+
+ # --- GARDEN
+register(
+    id='Garden-v0',
+    entry_point='envs.grids.garden_environment:GardenEnv',
+    max_episode_steps=250
+)
+
+# --- MINING
+register(
+    id='Mining-v0',
+    entry_point='envs.grids.grid_environment:MiningRMEnvM',
+    max_episode_steps=1000
+)

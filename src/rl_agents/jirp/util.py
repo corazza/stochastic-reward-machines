@@ -1,14 +1,75 @@
 import random
 import itertools
 import os, tempfile
+import copy
 from collections import defaultdict
-# from graphviz import Digraph
+from graphviz import Digraph
 import IPython
 
 from rl_agents.jirp.dnf_compile import compile_dnf, evaluate_dnf_compiled
 from reward_machines.reward_machine import RewardMachine
 
 from rl_agents.jirp.consts import *
+
+
+def approximate_hyp(approximation_method, language, transitions, n_states):
+    empty_transition = dnf_for_empty(language)
+    if n_states >= 2:
+        for i in range(2, n_states):
+            minimized_rm = approximation_method(MINIMIZATION_EPSILON, language, i, n_states, transitions, empty_transition, report=True)
+            if minimized_rm:
+                print(f"FOUND MINIMIZED RM {i} < {n_states}")
+                print(transitions)
+                print(minimized_rm)
+                return minimized_rm, n_states
+    print("couldn't find minimized RM, returning exact")
+
+    # display = False
+    # global last_displayed_states
+    # if n_states > last_displayed_states or n_states <= 2:
+    #     display = True
+    #     last_displayed_states = n_states
+    return approximation_method(EXACT_EPSILON, language, n_states, n_states, transitions, empty_transition, report=True, display=True), n_states
+
+def equivalent_on_X(noise_epsilon, eqv_check, H1, v1, H2, v2, X):
+    """
+    Checks if state v1 from RM H1 is equivalent to v2 from H2
+    """
+    H1 = H1.with_initial(v1)
+    H2 = H2.with_initial(v2)
+    total = len(X)
+    eqv = 0
+    for (labels, _rewards) in X:
+        output1 = rm_run(labels, H1)
+        output2 = rm_run(labels, H2)
+        if eqv_check(noise_epsilon+0.001, output1, output2):
+            eqv += 1
+        # if rm_run(labels, H1) == rm_run(labels, H2):
+        #     eqv += 1
+    if float(eqv)/total > EQV_THRESHOLD:
+        print(f"H_new/{v1} ~ H_old/{v2} (p ~= {float(eqv)/total})")
+        return True
+    return False
+
+def transfer_Q(noise_epsilon, check_eqv, H_new, H_old, Q_old, X):
+    """
+    Returns new set of q-functions, indexed by states of H_new, where
+    some of the q-functions may have been transfered from H_old if the
+    respective states were determined to be equivalent
+    
+    Although the thm. requires the outputs be the same on _all_ label sequences,
+    choosing probably equivalent states may be good enough.
+    """
+    Q = dict()
+    Q[-1] = dict() # (-1 is the index of the terminal state) (TODO check if necessary)
+    for v in H_new.get_states():
+        Q[v] = dict()
+        # find probably equivalent state u in H_old
+        for u in H_old.get_states():
+            if equivalent_on_X(noise_epsilon, check_eqv, H_new, v, H_old, u, X) and u in Q_old:
+                Q[v] = copy.deepcopy(Q_old[u])
+                break
+    return Q
 
 def rm_run(labels, H):
     """
@@ -199,7 +260,7 @@ def get_best_action(Q, s, actions, q_init):
     return random.choice(best)
 
 def display_transitions(transitions, name):
-    dot = Digraph(comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
+    dot = Digraph(format='png',comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
 
     nodes = set()
 
@@ -217,7 +278,7 @@ def display_transitions(transitions, name):
     dot.render(f"graphviz/{name}.gv", view=True)
 
 def display_rm(rm, name):
-    dot = Digraph(comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
+    dot = Digraph(format='png',comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
 
     nodes = set()
 

@@ -1,0 +1,10 @@
+0 # initial state || gold - g, silver - a, trap -f
+[1] # terminal state
+(0,0,'!g&!a&!f',ConstantRewardFunction(0))
+(0,2,'g&!a&!f',ConstantRewardFunction(0))
+(0,3,'!g&a&!f',ConstantRewardFunction(0))
+(2,1,'h|f',NoisyContLabelRewardFunction({"h": (1, 0.2), "f": (0, 0)}))
+(2,2,'&h&!f',ConstantRewardFunction(0))
+(2,2,'&!h&!f',ConstantRewardFunction(0))
+(3,1,'h|f',NoisyContLabelRewardFunction({"h": (1.1, 0.2), "f": (0, 0)}))
+(3,3,'&!h&!f',ConstantRewardFunction(0))

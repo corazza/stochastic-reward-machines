@@ -49,19 +49,45 @@ def initial_Q_nets_counters(H, env):
         Q[v] = Agent(main_dqn, target_dqn, replay_buffer, env.action_space.n,
                        input_shape=INPUT_SHAPE, batch_size=BATCH_SIZE, use_per=USE_PER)
         C[v] = 0
-    return Q, C 
+    return Q, C
 
 def clean_trace_montezuma(labels, rewards):
+    no_more_than = 10
     labels_new = list()
     rewards_new = list()
     last = None
+    counter = 0
     for i in range(0, len(labels)):
-        if labels[i] == last:
+        if labels[i] == last and counter > no_more_than:
             continue
+        elif labels[i] == last:
+            counter += 1
+        else:
+            counter = 0
         labels_new.append(labels[i])
         rewards_new.append(rewards[i])
         last = labels[i]
     return ((tuple(labels_new), tuple(rewards_new)))
+
+def split_trace(labels, rewards):
+    os = labels.count('o')
+    if labels[-1] == 'o':
+        new_traces_n = os
+    else:
+        new_traces_n = os + 1
+
+    new_traces = list()
+    for i in range(0, new_traces_n):
+        new_traces.append(([], []))
+
+    current_new_trace = 0
+    for i in range(0, len(labels)):
+        new_traces[current_new_trace][0].append(labels[i])
+        new_traces[current_new_trace][1].append(rewards[i])
+        if labels[i] == 'o':
+            current_new_trace += 1
+    
+    return list(map(lambda x: (tuple(x[0]),tuple(x[1])), new_traces))
 
 def automaton_reward(current_agent, new_obj_set_in, old_obj_set_in):
     new_detected_obj = list(set(new_obj_set_in) - set(old_obj_set_in))

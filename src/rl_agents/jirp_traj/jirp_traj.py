@@ -4,19 +4,18 @@ JIRP based method
 import math
 import itertools
 import random, time, copy
+from profilehooks import profile
 import IPython
 from baselines import logger
-import numpy as np
-import os.path
 
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
-from rl_agents.deepqjirp2.util import clean_trace_montezuma
 from rl_agents.jirp.util import *
 from rl_agents.jirp_noise.util import *
 from rl_agents.jirp.consts import *
 from rl_agents.jirp_noise.consts import *
 from rl_agents.jirp_noise.smt_noise import *
+
 
 def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
     """
@@ -47,46 +46,6 @@ def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
 
     raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
 
-def start_stepping(H, env, Q, actions, q_init):
-    rm_state = H.reset()
-    s = tuple(env.reset())
-
-    while True:
-        env.show()
-        a = get_best_action(Q[rm_state],s,actions,q_init)
-        sn, r, done, info = env.step(a)
-        sn = tuple(sn)
-        true_props = env.get_events()
-        next_rm_state, _rm_reward, rm_done = H.step(rm_state, true_props, info)
-        rm_state = next_rm_state
-        s = sn
-        IPython.embed()
-
-
-def detect_signal(a):
-    if os.path.isfile(f"signals/{a}.txt"):
-        print(f"detected signal signals/{a}.txt")
-        return True
-    return False
-
-def clean_trace(labels, rewards):
-    no_more_than = 10
-    labels_new = list()
-    rewards_new = list()
-    last = None
-    counter = 0
-    for i in range(0, len(labels)):
-        if labels[i] == last and counter > no_more_than:
-            continue
-        elif labels[i] == last:
-            counter += 1
-        else:
-            counter = 0
-        labels_new.append(labels[i])
-        rewards_new.append(rewards[i])
-        last = labels[i]
-    return ((tuple(labels_new), tuple(rewards_new)))
-
 def learn(env,
           network=None,
           seed=None,
@@ -104,10 +63,9 @@ def learn(env,
         noise_epsilon = env.current_rm.epsilon_cont
     except:
         noise_epsilon = NOISE_EPSILON
-    
-    print("alg noise epsilon:", noise_epsilon)
 
-    episode_rewards = [0.0]
+    reward_total = 0
+    total_episodes = 0
     step = 0
     num_episodes = 0
 
@@ -166,47 +124,39 @@ def learn(env,
             else:
                 next_random = True
 
+            reward_total += 1 if r > 1 else 0
             rewards.append(r)
             step += 1
-            episode_rewards[-1] += r
-
-            if step > 1e6:
-                epsilon = 0
-
-            num_episodes = len(episode_rewards)
             if step%print_freq == 0:
-                mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
                 logger.record_tabular("steps", step)
                 logger.record_tabular("episodes", num_episodes)
-                logger.record_tabular(f"mean 100 episode reward", mean_100ep_reward)
                 logger.record_tabular("n states", len(H.U))
                 logger.record_tabular("len(X_new)", len(X_new))
+                logger.record_tabular("total reward", reward_total)
+                logger.record_tabular("positive / total", str(int(reward_total)) + "/" + str(total_episodes) + f" ({int(100*(reward_total/total_episodes))}%)")
                 logger.dump_tabular()
+                reward_total = 0
+                total_episodes = 0
             if done:
-                if os.path.isfile("signal.txt"):
-                    print("detected signal")
-                    IPython.embed()
-
-                episode_rewards.append(0.0)
-                if not run_eqv_noise(noise_epsilon, rm_run(labels, H), rewards):
-                    # (labels, rewards) = clean_trace(labels, rewards)
+                num_episodes += 1
+                total_episodes += 1
+                if not run_eqv_noise(noise_epsilon+0.00001, rm_run(labels, H), rewards):
                     if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
-                        if info["TimeLimit.truncated"]:
+                        tl = info["TimeLimit.truncated"]
+                        if tl:
                             X_tl.add((tuple(labels), tuple(rewards)))
 
                     fixed = make_consistent(noise_epsilon, labels, rewards, X, H)
-                    if fixed is not None: # we don't try to fix on first few counterexamples
+                    if fixed is not None:
                         X.add((tuple(labels), tuple(rewards)))
+                        # IPython.embed()
                         H = fixed
-                        print("FIXEDFIXEDFIXED")
                     else:
                         X_new.add((tuple(labels), tuple(rewards)))
 
                 if X_new and num_episodes % NOISE_UPDATE_X_EVERY_N == 0:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
-                    if detect_signal("xnew"):
-                        IPython.embed()
                     X.update(X_new)
                     X_new = set()
                     language = sample_language(X)
@@ -214,8 +164,7 @@ def learn(env,
                     transitions_new, n_states_last = consistent_hyp(noise_epsilon, X, X_tl, n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
                     H = H_new
-                    average_on_X(noise_epsilon, H, X)
-                    # lower(H, language) HERE
+                    average_on_X(H, X)
                     transitions = transitions_new
                     Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X)
                 break

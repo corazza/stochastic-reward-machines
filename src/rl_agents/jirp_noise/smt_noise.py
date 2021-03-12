@@ -1,18 +1,21 @@
 from z3 import *
 
-from rl_agents.jirp.util import *
-from rl_agents.jirp.consts import *
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
+from rl_agents.jirp.consts import *
+from rl_agents.jirp.util import *
 
 
 def smt_noise(epsilon, X, X_tl, n_states, report=True, inspect=False, display=False):
+    # from rl_agents.jirp.util import sample_language
+    # IPython.embed()
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
 
     d_dict = dict()
     o_dict = dict() # represents guessed mean
+    e_dict = dict() # exact
     n_dict = dict()
     x_dict = dict()
     
@@ -26,6 +29,7 @@ def smt_noise(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fa
     for p in all_states_here(n_states):
         for a in language:
             o_dict[(p, a)] = Real(f"o/{p}-{a}")
+            e_dict[(p, a)] = Bool(f"e/{p}-{a}")
 
     def add_x(ls, p):
         nonlocal x_dict
@@ -81,10 +85,6 @@ def smt_noise(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fa
             x = add_x(lm, p)
             o = o_dict[(p, l)]
             s.add(Implies(x, And(r - o >= -epsilon, r - o <= epsilon)))
-            # for q in all_states_here(n_states):
-            #     d = d_dict[(p, l, q)]
-            #     # HERE
-            #     s.add(Implies(And(x, d), And(r - o >= -epsilon, r - o <= epsilon)))
 
     # (Termination)
     if TERMINATION:

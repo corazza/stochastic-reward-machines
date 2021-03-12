@@ -1,6 +1,6 @@
 from reward_machines.reward_functions import *
 from reward_machines.reward_machine_utils import value_iteration
-from rl_agents.jirp.label_reward_function import LabelRewardFunction, NoisyContRewardFunction
+from rl_agents.jirp.label_reward_function import LabelRewardFunction, NoisyContRewardFunction, NoisyContLabelRewardFunction
 from rl_agents.jirp.dnf_compile import compile_dnf, evaluate_dnf_compiled
 
 import time
@@ -153,7 +153,7 @@ class RewardMachine:
         for e in lines[2:]:
             # Reading the transition
             u1, u2, dnf_formula, reward_function = eval(e)
-            if isinstance(reward_function, NoisyContRewardFunction):
+            if isinstance(reward_function, NoisyContRewardFunction) or isinstance(reward_function, NoisyContLabelRewardFunction):
                 if self.epsilon_cont is None:
                     self.epsilon_cont = reward_function.eps
                 elif self.epsilon_cont < reward_function.eps:

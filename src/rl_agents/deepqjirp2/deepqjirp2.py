@@ -28,7 +28,7 @@ from rl_agents.jirp.consts import *
 from rl_agents.jirp.jirp import consistent_hyp, equivalent_on_X
 
 
-def transfer_Q_counters(env, H_new, H_old, Q_old, C_old, X = {}):
+def transfer_Q_counters(env, H_new, H_old, Q_old, C_old, X):
     Q = dict()
     C = dict()
     for v in H_new.get_states():
@@ -36,9 +36,9 @@ def transfer_Q_counters(env, H_new, H_old, Q_old, C_old, X = {}):
         C[v] = None
         # find probably equivalent state u in H_old
         for u in H_old.get_states():
-            if equivalent_on_X(H_new, v, H_old, u, X) and u in Q_old:
+            if equivalent_on_X(H_new, v, H_old, u, X):
                 Q[v] = Q_old[u]
-                C[v] = C_old[v]
+                C[v] = C_old[u]
                 break
         if Q[v] is None:
             main_dqn = build_q_network(n_actions=env.action_space.n, learning_rate=LEARNING_RATE)
@@ -48,6 +48,10 @@ def transfer_Q_counters(env, H_new, H_old, Q_old, C_old, X = {}):
                            input_shape=INPUT_SHAPE, batch_size=BATCH_SIZE, use_per=USE_PER)
             C[v] = 0
     return Q, C
+
+
+# HERE
+# make sure infer_termination works correctly
 
 def learn(env,
           network,
@@ -92,7 +96,7 @@ def learn(env,
     jirp_rewards = []
     next_random = False
 
-    transitions, n_states_last = consistent_hyp(set(), set())
+    transitions, n_states_last = consistent_hyp(set(), set(), infer_termination=False)
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     H = rm_from_transitions(transitions, empty_transition)
@@ -114,7 +118,10 @@ def learn(env,
                 if callback(locals(), globals()):
                     break
 
-            action = Q[rm_state].get_action(t, env.state)
+            if rm_state != H.terminal_u:
+                action = Q[rm_state].get_action(t, env.state)
+            else:
+                np.random.randint(0, env.action_space.n)
 
             env_action = action
             new_obs, rew, done, info = env.step(env_action)
@@ -146,6 +153,7 @@ def learn(env,
                 Q[p].add_experience(action=action, frame=new_obs[:, :, 0], reward=h_r, next_rm_state=p_next, terminal=done or info['life_lost'] or h_done)
                 C[p] += 1
 
+            obs = new_obs
             if not rm_done or not TERMINATION:
                 rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
             else:
@@ -160,20 +168,10 @@ def learn(env,
                                                     priority_scale=PRIORITY_SCALE)
                 # loss_list.append(loss)
 
-            # HERE
-            # min_replay_buffer_size and q.replay_buffer_start size-- unalined in my current code?
-
-            # check papers on automata learning from noisy data
-
-            ## BREAK IT ON LOSS
-
             # Update target network
             for p in H.get_states():
                 if C[p] % TARGET_UPDATE_FREQ == 0 and C[p] > MIN_REPLAY_BUFFER_SIZE:
                     Q[p].update_target_network()
-
-            obs = new_obs
-            rm_state = next_rm_state
 
             episode_rewards[-1] += rew
             if info['life_lost']:
@@ -186,27 +184,29 @@ def learn(env,
                 episode_rewards.append(0.0)
 
                 if not run_eqv(EXACT_EPSILON, rm_run(jirp_labels, H), jirp_rewards):
-                    X_new.add(clean_trace_montezuma(tuple(jirp_labels), tuple(jirp_rewards)))
-                    if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
-                        tl = info["TimeLimit.truncated"]
-                        if tl:
-                            X_tl.add(clean_trace_montezuma(tuple(jirp_labels), tuple(jirp_rewards)))
+                    clean = clean_trace_montezuma(tuple(jirp_labels), tuple(jirp_rewards))
+                    splits = split_trace(clean[0], clean[1])
+                    X_new.update(splits)
+                    # if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
+                    #     tl = info["TimeLimit.truncated"]
+                    #     if tl:
+                    #         X_tl.add(splits[-1])
 
                 jirp_labels = list()
                 jirp_rewards = list()
 
-                ## need to have separate counters in the end for when new dqns are created
-
-                if num_episodes % UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
+                if X_new and num_episodes % DEEPQJIRP_UPDATE_X_EVERY_N == 0:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
                     X.update(X_new)
                     X_new = set()
                     language = sample_language(X)
                     empty_transition = dnf_for_empty(language)
-                    transitions_new, n_states_last = consistent_hyp(X, X_tl, n_states_last)
+                    if len(X) > 100:
+                        IPython.embed()
+                    transitions_new, n_states_last = consistent_hyp(X, X_tl, infer_termination=False, n_states_start=n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
-                    Q, C = transfer_Q_counters(env, H_new, H, Q, X)
+                    Q, C = transfer_Q_counters(env, H_new, H, Q, C, X)
                     H = H_new
                     transitions = transitions_new
 

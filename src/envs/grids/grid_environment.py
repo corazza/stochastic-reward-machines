@@ -256,3 +256,16 @@ class CraftRM10EnvM10(CraftRM10Env):
         file_map = "./envs/grids/maps/map_10.txt"
         super().__init__(file_map)
 
+
+# --- MINING
+
+class MiningRMEnv(GridRMEnv):
+    def __init__(self, file_map):
+        rm_files = ["./envs/grids/reward_machines/mine/t1.txt"]
+        env = CraftWorld(file_map)
+        super().__init__(GridEnv(env), rm_files)
+
+class MiningRMEnvM(MiningRMEnv):
+    def __init__(self):
+        file_map = "./envs/grids/maps/map_13.txt"
+        super().__init__(file_map)

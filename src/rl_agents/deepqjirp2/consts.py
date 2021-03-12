@@ -18,3 +18,6 @@ EVAL_LENGTH = 10000               # Number of frames to evaluate for
 PRIORITY_SCALE = 0.7               # How much the replay buffer should sample based on priorities. 0 = complete random samples, 1 = completely aligned with priorities
 
 TOTAL_TIMESTEPS = int(1e7 / 6)       # Total number of frames to train for
+
+
+DEEPQJIRP_UPDATE_X_EVERY_N = 30

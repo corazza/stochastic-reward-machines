@@ -5,7 +5,7 @@ from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 from pysat.solvers import Glucose4
 
 
-def sat_hyp(epsilon, X, X_tl, n_states, report=True, inspect=False, display=False):
+def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=False, display=False):
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
@@ -94,7 +94,7 @@ def sat_hyp(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fals
             g.add_clause([-x, o])
     
     # (Termination)
-    if TERMINATION:
+    if infer_termination:
         for (labels, _rewards) in prefixes(X, without_terminal=True):
             if labels == ():
                 continue

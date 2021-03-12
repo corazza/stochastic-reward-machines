@@ -4,8 +4,8 @@ JIRP based method
 import math
 import itertools
 import random, time, copy
-from profilehooks import profile
 import IPython
+import numpy as np
 from baselines import logger
 
 from reward_machines.reward_machine import RewardMachine
@@ -23,7 +23,7 @@ from rl_agents.jirp.sat_hyp import sat_hyp
 last_displayed_states = 0
 
 # @profile(sort="tottime")
-def consistent_hyp(X, X_tl, n_states_start=2, report=True):
+def consistent_hyp(X, X_tl, infer_termination=True, n_states_start=2, report=True):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
     and its number of states
@@ -40,7 +40,7 @@ def consistent_hyp(X, X_tl, n_states_start=2, report=True):
         if report:
             print(f"finding model with {n_states} states")
         # print("(SMT)")
-        new_transitions = sat_hyp(0.15, X, X_tl, n_states)
+        new_transitions = sat_hyp(0.15, X, X_tl, n_states, infer_termination)
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
         if new_transitions is not None:
@@ -124,18 +124,18 @@ def learn(env,
           use_rs=False):
     assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
 
-    IPython.embed()
-
     reward_total = 0
     total_episodes = 0
     step = 0
     num_episodes = 0
+    episode_rewards = [0.0]
 
     X = set()
     X_new = set()
     X_tl = set()
     labels = []
     rewards = []
+    do_embed = True
 
     transitions, n_states_last = consistent_hyp(set(), set())
     language = sample_language(X)
@@ -196,22 +196,25 @@ def learn(env,
                 next_random = True
 
             # moving to the next state
-            reward_total += r
+            reward_total += 1 if r > 2 else 0
             rewards.append(r)
             step += 1
+            episode_rewards[-1] += r
+
             if step%print_freq == 0:
+                mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
+                num_episodes = len(episode_rewards)
                 logger.record_tabular("steps", step)
                 logger.record_tabular("episodes", num_episodes)
+                logger.record_tabular("mean 100 episode reward", mean_100ep_reward)
                 logger.record_tabular("n states", len(H.U))
                 logger.record_tabular("len(X_new)", len(X_new))
-                logger.record_tabular("total reward", reward_total)
-                logger.record_tabular("positive / total", str(int(reward_total)) + "/" + str(total_episodes) + f" ({int(100*(reward_total/total_episodes))}%)")
                 logger.dump_tabular()
-                reward_total = 0
-                total_episodes = 0
             if done:
-                num_episodes += 1
-                total_episodes += 1
+                if step > 1e6 and do_embed:
+                    IPython.embed()
+                num_episodes = len(episode_rewards)
+                episode_rewards.append(0.0)
 
                 if not run_eqv(EXACT_EPSILON, rm_run(labels, H), rewards):
                     X_new.add((tuple(labels), tuple(rewards)))
@@ -220,7 +223,7 @@ def learn(env,
                         if tl:
                             X_tl.add((tuple(labels), tuple(rewards)))
 
-                if num_episodes % UPDATE_X_EVERY_N_EPISODES == 0 and X_new:
+                if X_new and num_episodes % UPDATE_X_EVERY_N == 0:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
                     X.update(X_new)
