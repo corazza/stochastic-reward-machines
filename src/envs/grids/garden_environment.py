@@ -12,7 +12,7 @@ import numpy as np
 from rl_agents.jirp_noise.consts import NOISE_EPSILON
 
 
-PERTURB_PROB = 0 # 0.05
+PERTURB_PROB = 0.05
 
 class GardenEnv(gym.Env):
     def __init__(self):
@@ -76,7 +76,7 @@ class GardenEnv(gym.Env):
             reward = 1
         elif label == 'g' and self.state == 1:
             self.state = 2
-            reward = 3
+            reward = 1
             self.harvest = random.randint(1, 2)
         elif label == 'm' and self.state == 2:
             if self.harvest == 1:

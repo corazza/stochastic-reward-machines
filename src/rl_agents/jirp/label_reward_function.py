@@ -15,6 +15,12 @@ class LabelRewardFunction(RewardFunction):
     def get_type(self):
         return "label"
 
+    def get_means(self):
+        result = set()
+        for dnf in self.label_rewards:
+            result.add(self.label_rewards[dnf])
+        return result
+
     def get_reward(self, s_info):
         if "true_props" not in s_info:
             return 0.0
@@ -54,8 +60,11 @@ class NoisyContLabelRewardFunction(RewardFunction):
     def get_type(self):
         return "noisy_cont_label"
 
-    def get_mean(self, s_info):
-        return self.c
+    def get_means(self):
+        result = set()
+        for dnf in self.label_rewards:
+            result.add(self.label_rewards[dnf][0]) # mean, eps
+        return result
 
     def get_reward(self, s_info):
         if "true_props" not in s_info:
@@ -85,8 +94,11 @@ class NoisyContRewardFunction(RewardFunction):
     def get_type(self):
         return "noisy_cont"
 
-    def get_mean(self, s_info):
+    def get_mean(self):
         return self.c
+
+    def get_means(self):
+        return set([self.c])
 
     def get_reward(self, s_info):
         return self.c + random.uniform(-self.eps, self.eps)

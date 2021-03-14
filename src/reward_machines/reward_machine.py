@@ -18,6 +18,7 @@ class RewardMachine:
         self.epsilon_cont = None # non-zero for continuous noise
         self._load_reward_machine(file)
         self.known_transitions = {} # Auxiliary variable to speed up computation of the next RM state
+        self.noise_delta = None # smallest distance between two means
 
     # Public methods -----------------------------------
 
@@ -101,9 +102,6 @@ class RewardMachine:
             reward_function.c = to
 
     def _get_mean(self,u1,u2,s_info,add_rs,env_done):
-        """
-        Returns the reward associated to this transition.
-        """
         # Getting reward from the RM
         reward = 0 # NOTE: if the agent falls from the reward machine it receives reward of zero
         if u1 in self.delta_r and u2 in self.delta_r[u1]:
@@ -150,6 +148,7 @@ class RewardMachine:
         self.u0 = eval(lines[0])
         terminal_states = eval(lines[1])
         # adding transitions
+        means = set()
         for e in lines[2:]:
             # Reading the transition
             u1, u2, dnf_formula, reward_function = eval(e)
@@ -158,6 +157,13 @@ class RewardMachine:
                     self.epsilon_cont = reward_function.eps
                 elif self.epsilon_cont < reward_function.eps:
                     self.epsilon_cont = reward_function.eps
+            
+            if isinstance(reward_function, ConstantRewardFunction):
+                means.add(reward_function.c)
+            else: # assume only constant, noisy, label, and noisy label are used
+                means.update(reward_function.get_means())
+
+
             # terminal states
             if u1 in terminal_states:
                 continue
@@ -177,6 +183,16 @@ class RewardMachine:
             self.delta_r[u1][u2] = reward_function
         # Sorting self.U... just because... 
         self.U = sorted(self.U)
+
+        means = sorted(list(means))
+        self.noise_delta = None
+        for i in range(0, len(means)-1):
+            delta = means[i+1] - means[i]
+            if self.noise_delta is None:
+                self.noise_delta = delta
+            else:
+                if delta < self.noise_delta:
+                    self.noise_delta = delta
 
     def _add_state(self, u_list):
         for u in u_list:

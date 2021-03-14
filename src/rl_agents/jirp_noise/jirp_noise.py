@@ -5,13 +5,13 @@ import math
 import itertools
 import random, time, copy
 import IPython
+from profilehooks import profile
 from baselines import logger
 import numpy as np
 import os.path
 
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
-from rl_agents.deepqjirp2.util import clean_trace_montezuma
 from rl_agents.jirp.util import *
 from rl_agents.jirp_noise.util import *
 from rl_agents.jirp.consts import *
@@ -62,7 +62,6 @@ def start_stepping(H, env, Q, actions, q_init):
         s = sn
         IPython.embed()
 
-
 def detect_signal(a):
     if os.path.isfile(f"signals/{a}.txt"):
         print(f"detected signal signals/{a}.txt")
@@ -87,6 +86,8 @@ def clean_trace(labels, rewards):
         last = labels[i]
     return ((tuple(labels_new), tuple(rewards_new)))
 
+
+# @profile
 def learn(env,
           network=None,
           seed=None,
@@ -104,16 +105,21 @@ def learn(env,
         noise_epsilon = env.current_rm.epsilon_cont
     except:
         noise_epsilon = NOISE_EPSILON
+
+    try:
+        noise_delta = env.current_rm.noise_delta
+        assert noise_delta is not None
+    except:
+        noise_delta = NOISE_DELTA
     
     print("alg noise epsilon:", noise_epsilon)
-
-    episode_rewards = [0.0]
-    step = 0
-    num_episodes = 0
+    print("alg noise delta:", noise_delta)
 
     X = set()
+    All = set()
     X_new = set()
     X_tl = set()
+
     labels = []
     rewards = []
 
@@ -124,6 +130,10 @@ def learn(env,
     # H = load("./envs/grids/reward_machines/office/t3.txt")
     actions = list(range(env.action_space.n))
     Q = initial_Q(H)
+
+    episode_rewards = [0.0]
+    step = 0
+    num_episodes = 0
 
     while step < total_timesteps:
         s = tuple(env.reset())
@@ -166,12 +176,12 @@ def learn(env,
             else:
                 next_random = True
 
+            # HERE
+            # Average every N episodes
+
             rewards.append(r)
             step += 1
             episode_rewards[-1] += r
-
-            if step > 1e6:
-                epsilon = 0
 
             num_episodes = len(episode_rewards)
             if step%print_freq == 0:
@@ -183,11 +193,18 @@ def learn(env,
                 logger.record_tabular("len(X_new)", len(X_new))
                 logger.dump_tabular()
             if done:
+                if num_episodes == 10000:
+                    f = open("noise_rewards.txt", 'w')
+                    f.write(str(episode_rewards))
+                    f.close()
+                    IPython.embed()
+
                 if os.path.isfile("signal.txt"):
                     print("detected signal")
                     IPython.embed()
 
                 episode_rewards.append(0.0)
+                All.add((tuple(labels), tuple(rewards)))
                 if not run_eqv_noise(noise_epsilon, rm_run(labels, H), rewards):
                     # (labels, rewards) = clean_trace(labels, rewards)
                     if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
@@ -213,9 +230,12 @@ def learn(env,
                     empty_transition = dnf_for_empty(language)
                     transitions_new, n_states_last = consistent_hyp(noise_epsilon, X, X_tl, n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
+                    if not consistent_on_all(noise_epsilon, X, H_new):
+                        print("NOT CONSISTENT IMMMEDIATELY")
+                        IPython.embed()
+                    H_old = copy.deepcopy(H)
                     H = H_new
-                    average_on_X(noise_epsilon, H, X)
-                    # lower(H, language) HERE
+                    average_on_X(noise_epsilon, H, All, X)
                     transitions = transitions_new
                     Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X)
                 break

@@ -49,9 +49,11 @@ def make_consistent(epsilon, labels, rewards, X, H):
         return None
     return H2
 
-def average_on_X(epsilon, H, X):
+def average_on_X(epsilon, H, All, X):
     outputs_dict = dict()
-    for (labels, rewards) in X:
+    for (labels, rewards) in All:
+        if len(rm_run(labels, H)) != len(rewards):
+            continue
         current_state = H.reset()
         for i in range(0, len(labels)):
             props = labels[i]
@@ -65,7 +67,7 @@ def average_on_X(epsilon, H, X):
         average = sum(rewards)/len(rewards)
         H2 = copy.deepcopy(H)
         H2.move_output(statelabel[0], statelabel[1], average)
-        if consistent_on_all(epsilon-0.0001, X, H2):
+        if consistent_on_all(epsilon, X, H2):
             H.move_output(statelabel[0], statelabel[1], average)
             print(f"average {statelabel[0]}-{statelabel[1]}: {average}")
 
