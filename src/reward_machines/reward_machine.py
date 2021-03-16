@@ -1,3 +1,4 @@
+import IPython
 from reward_machines.reward_functions import *
 from reward_machines.reward_machine_utils import value_iteration
 from rl_agents.jirp.label_reward_function import LabelRewardFunction, NoisyContRewardFunction, NoisyContLabelRewardFunction
@@ -16,9 +17,9 @@ class RewardMachine:
         self.delta_r    = {} # reward-transition function
         self.terminal_u = -1  # All terminal states are sent to the same terminal state with id *-1*
         self.epsilon_cont = None # non-zero for continuous noise
+        self.noise_delta = None # smallest distance between two means
         self._load_reward_machine(file)
         self.known_transitions = {} # Auxiliary variable to speed up computation of the next RM state
-        self.noise_delta = None # smallest distance between two means
 
     # Public methods -----------------------------------
 

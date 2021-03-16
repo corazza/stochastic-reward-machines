@@ -3,7 +3,6 @@ import itertools
 import os, tempfile
 import copy
 from collections import defaultdict
-from graphviz import Digraph
 import IPython
 
 from rl_agents.jirp.dnf_compile import compile_dnf, evaluate_dnf_compiled
@@ -260,6 +259,7 @@ def get_best_action(Q, s, actions, q_init):
     return random.choice(best)
 
 def display_transitions(transitions, name):
+    from graphviz import Digraph
     dot = Digraph(format='png',comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
 
     nodes = set()

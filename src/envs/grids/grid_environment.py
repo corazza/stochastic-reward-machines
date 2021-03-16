@@ -259,13 +259,17 @@ class CraftRM10EnvM10(CraftRM10Env):
 
 # --- MINING
 
-class MiningRMEnv(GridRMEnv):
-    def __init__(self, file_map):
+class MiningRMEnvT1(GridRMEnv):
+    def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t1.txt"]
-        env = CraftWorld(file_map)
+        file_map = "./envs/grids/maps/map_13.txt"
+        env = CraftWorld(file_map, slip_chance=0.00)
         super().__init__(GridEnv(env), rm_files)
 
-class MiningRMEnvM(MiningRMEnv):
+class MiningRMEnvT2(GridRMEnv):
     def __init__(self):
+        rm_files = ["./envs/grids/reward_machines/mine/t2.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        super().__init__(file_map)
+        env = CraftWorld(file_map, slip_chance=0.00)
+        super().__init__(GridEnv(env), rm_files)
+

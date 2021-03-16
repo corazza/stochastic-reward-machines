@@ -24,6 +24,7 @@ from baselines import logger
 from rl_agents.deepqjirp2.util import *
 from rl_agents.deepqjirp2.consts import *
 from rl_agents.jirp.util import *
+from rl_agents.jirp_noise.util import detect_signal
 from rl_agents.jirp.consts import *
 from rl_agents.jirp.jirp import consistent_hyp, equivalent_on_X
 
@@ -52,6 +53,8 @@ def transfer_Q_counters(env, H_new, H_old, Q_old, C_old, X):
 
 # HERE
 # make sure infer_termination works correctly
+
+# the labels get announced sooner than rewards are given! some label preprocessing must be done
 
 def learn(env,
           network,
@@ -178,15 +181,26 @@ def learn(env,
                 observed_events = set()
                 rm_state = H.reset()
             if done:
+                if detect_signal("montdone"):
+                    IPython.embed()
                 obs = env.reset()
                 observed_events = set()
                 rm_state = H.reset()
                 episode_rewards.append(0.0)
 
                 if not run_eqv(EXACT_EPSILON, rm_run(jirp_labels, H), jirp_rewards):
-                    clean = clean_trace_montezuma(tuple(jirp_labels), tuple(jirp_rewards))
-                    splits = split_trace(clean[0], clean[1])
-                    X_new.update(splits)
+                    # clean = clean_trace_montezuma(tuple(jirp_labels), tuple(jirp_rewards))
+                    # clean = (tuple(jirp_labels), tuple(jirp_rewards))
+                    # splits = split_trace(clean[0], clean[1])
+                    
+                    
+                    # X_new.add((tuple(jirp_labels), tuple(jirp_rewards)))
+                    X_new.add(align_trace(jirp_labels, jirp_rewards))
+
+
+                    # for (jirp_labelsx, jirp_rewardsx) in splits:
+                    #     if not run_eqv(EXACT_EPSILON, rm_run(jirp_labelsx, H), jirp_rewardsx):
+                    #         X_new.add((jirp_labelsx, jirp_rewardsx))
                     # if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
                     #     tl = info["TimeLimit.truncated"]
                     #     if tl:
@@ -195,9 +209,10 @@ def learn(env,
                 jirp_labels = list()
                 jirp_rewards = list()
 
-                if X_new and num_episodes % DEEPQJIRP_UPDATE_X_EVERY_N == 0:
+                if X_new: # and num_episodes % DEEPQJIRP_UPDATE_X_EVERY_N == 0:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
+                    IPython.embed()
                     X.update(X_new)
                     X_new = set()
                     language = sample_language(X)
@@ -217,6 +232,7 @@ def learn(env,
                 logger.record_tabular("episodes", num_episodes)
                 logger.record_tabular("mean 100 episode reward", mean_100ep_reward)
                 logger.record_tabular("Q-nets", len(Q))
+                logger.record_tabular("len(X_new)", len(X_new))
                 logger.dump_tabular()
                 # snapshot = tracemalloc.take_snapshot()
                 # display_top(snapshot)

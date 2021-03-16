@@ -62,12 +62,6 @@ def start_stepping(H, env, Q, actions, q_init):
         s = sn
         IPython.embed()
 
-def detect_signal(a):
-    if os.path.isfile(f"signals/{a}.txt"):
-        print(f"detected signal signals/{a}.txt")
-        return True
-    return False
-
 def clean_trace(labels, rewards):
     no_more_than = 10
     labels_new = list()
@@ -133,6 +127,8 @@ def learn(env,
 
     episode_rewards = [0.0]
     step = 0
+    step_scores = list()
+    step_rebuilding = list()
     num_episodes = 0
 
     while step < total_timesteps:
@@ -184,8 +180,12 @@ def learn(env,
             episode_rewards[-1] += r
 
             num_episodes = len(episode_rewards)
+            mean_100ep_reward = np.mean(episode_rewards[-101:-1])
+
+            if step%5000 == 0:
+                step_scores.append((step, mean_100ep_reward))
+
             if step%print_freq == 0:
-                mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
                 logger.record_tabular("steps", step)
                 logger.record_tabular("episodes", num_episodes)
                 logger.record_tabular(f"mean 100 episode reward", mean_100ep_reward)
@@ -193,17 +193,12 @@ def learn(env,
                 logger.record_tabular("len(X_new)", len(X_new))
                 logger.dump_tabular()
             if done:
-                if num_episodes == 10000:
-                    f = open("noise_rewards.txt", 'w')
-                    f.write(str(episode_rewards))
-                    f.close()
-                    IPython.embed()
-
                 if os.path.isfile("signal.txt"):
                     print("detected signal")
                     IPython.embed()
 
                 episode_rewards.append(0.0)
+
                 All.add((tuple(labels), tuple(rewards)))
                 if not run_eqv_noise(noise_epsilon, rm_run(labels, H), rewards):
                     # (labels, rewards) = clean_trace(labels, rewards)
@@ -238,5 +233,9 @@ def learn(env,
                     average_on_X(noise_epsilon, H, All, X)
                     transitions = transitions_new
                     Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X)
+                    step_rebuilding.append(step)
                 break
             s = sn
+
+    print("fin")
+    IPython.embed()

@@ -81,7 +81,13 @@ register(
 
 # --- MINING
 register(
-    id='Mining-v0',
-    entry_point='envs.grids.grid_environment:MiningRMEnvM',
+    id='MiningT1-v0',
+    entry_point='envs.grids.grid_environment:MiningRMEnvT1',
+    max_episode_steps=1000
+)
+
+register(
+    id='MiningT2-v0',
+    entry_point='envs.grids.grid_environment:MiningRMEnvT2',
     max_episode_steps=1000
 )

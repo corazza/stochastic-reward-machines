@@ -45,9 +45,9 @@ def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
 
 
 def compute_n_samples(epsilon, delta):
-    ci = delta/(4*4.0)
+    ci = delta/4.0
     sigma = (2*epsilon)**2 / 12
-    return max(10, math.ceil(((Z_CONF * sigma) / ci)**2))
+    return max(50, math.ceil(((Z_CONF * sigma) / ci)**2))
 
 def add_to_bank(actions, labels, rewards, sequences_bank, actions_bank):
     if labels not in sequences_bank:
@@ -72,10 +72,11 @@ def recompute_X(n_samples, noise_delta, X, sequences_bank):
         samples = sequences_bank[labels]
         assert len(samples) >= n_samples
         for i in range(0, len(rewards)):
-            rewards_average.append(0)
+            rewards_average.append(list())
             for j in range(0, len(samples)):
-                rewards_average[i] += samples[j][i]
-            rewards_average[i] /= len(samples)
+                rewards_average[i].append(samples[j][i])
+            rewards_average[i] = sorted(rewards_average[i])
+            rewards_average[i] = (rewards_average[i][0] + rewards_average[i][-1]) / 2.0
             means.add(rewards_average[i])
         X_result.add((labels, tuple(rewards_average)))
     
@@ -85,19 +86,28 @@ def recompute_X(n_samples, noise_delta, X, sequences_bank):
         for j in range(i+1, len(means)):
             if abs(means[i] - means[j]) < noise_delta/2: # confidence intervals overlap
                 groups[j] = groups[i]
+    print("means", means)
 
     grouped_means = dict()
-
     for i in range(0, len(means)):
         if groups[i] not in grouped_means:
             grouped_means[groups[i]] = set()
         grouped_means[groups[i]].add(means[i])
+    print("grouped_means", grouped_means)
 
+    group_average_set = set()
     collapsed_means = dict()
     for group in grouped_means:
         group_average = sum(grouped_means[group])/len(grouped_means[group])
+        group_average_set.add(group_average)
         for mean in grouped_means[group]:
             collapsed_means[mean] = group_average
+    print("collapsed means", collapsed_means)
+    print("group average set", group_average_set)
+
+    if len(group_average_set) > 3:
+        print("TOO MANY AVERAGES")
+        IPython.embed()
 
     X_final = set()
     for (labels, rewards) in X_result:
@@ -107,43 +117,6 @@ def recompute_X(n_samples, noise_delta, X, sequences_bank):
         X_final.add((labels, tuple(rewards_collapsed)))
 
     return X_final
-
-def collapsed_means(n_samples, noise_delta, X, sequences_bank):
-    X_result = set()
-    means = set()
-    for (labels, rewards) in X:
-        rewards_average = list()
-        samples = sequences_bank[labels]
-        assert len(samples) >= n_samples
-        for i in range(0, len(rewards)):
-            rewards_average.append(0)
-            for j in range(0, len(samples)):
-                rewards_average[i] += samples[j][i]
-            rewards_average[i] /= len(samples)
-            means.add(rewards_average[i])
-        X_result.add((labels, tuple(rewards_average)))
-    
-    means = list(means)
-    groups = list(range(0, len(means)))
-    for i in range(0, len(means)):
-        for j in range(i+1, len(means)):
-            if abs(means[i] - means[j]) < noise_delta/2: # confidence intervals overlap
-                groups[j] = groups[i]
-
-    grouped_means = dict()
-
-    for i in range(0, len(means)):
-        if groups[i] not in grouped_means:
-            grouped_means[groups[i]] = set()
-        grouped_means[groups[i]].add(means[i])
-
-    collapsed_means = dict()
-    for group in grouped_means:
-        group_average = sum(grouped_means[group])/len(grouped_means[group])
-        for mean in grouped_means[group]:
-            collapsed_means[mean] = group_average
-
-    return collapsed_means
 
 # @profile
 def learn(env,
@@ -173,11 +146,12 @@ def learn(env,
     n_samples = compute_n_samples(noise_epsilon, noise_delta)
     print("alg noise epsilon:", noise_epsilon)
     print("alg noise delta:", noise_delta)
-    print(f"need {n_samples} samples for 95% confidence")
+    print(f"need {n_samples} samples for 99% confidence")
 
     sequences_bank = dict()
     actions_bank = dict()
     X = set()
+    X_averaged = set()
     All = set()
     X_new = set()
     X_tl = set()
@@ -195,6 +169,9 @@ def learn(env,
     Q = initial_Q(H)
 
     episode_rewards = [0.0]
+    evaluation_episode_rewards = [0.0]
+    step_scores = list()
+    step_rebuilding = list()
     step = 0
     num_episodes = 0
 
@@ -219,8 +196,13 @@ def learn(env,
             if following_traj is None:
                 a = random.choice(actions) if random.random() < epsilon or next_random else get_best_action(Q[rm_state],s,actions,q_init)
             else:
-                a = actions_bank[following_traj][which_one][len(done_actions_list)]
-            
+                try:
+                    if len(done_actions_list) < len(actions_bank[following_traj][which_one]):
+                        a = actions_bank[following_traj][which_one][len(done_actions_list)]
+                    else:
+                        a = random.choice(actions)
+                except:
+                    IPython.embed()            
             sn, r, done, info = env.step(a)
 
             sn = tuple(sn)
@@ -256,13 +238,18 @@ def learn(env,
             rewards.append(r)
             step += 1
             episode_rewards[-1] += r
+    
+            if following_traj is None:
+                evaluation_episode_rewards[-1] += r
 
             num_episodes = len(episode_rewards)
+            num_evaluation_episodes = len(evaluation_episode_rewards)
+            mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
+            mean_100evalep_reward = np.mean(evaluation_episode_rewards[-101:-1])
             if step%print_freq == 0:
-                mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
                 logger.record_tabular("steps", step)
                 logger.record_tabular("episodes", num_episodes)
-                logger.record_tabular(f"mean 100 episode reward", mean_100ep_reward)
+                logger.record_tabular(f"mean 100 episode reward", mean_100evalep_reward)
                 logger.record_tabular("n states", len(H.U))
                 logger.record_tabular("len(X_new)", len(X_new))
                 found = 0
@@ -273,17 +260,18 @@ def learn(env,
                 logger.record_tabular("state", f"finding samples ({found})" if following_traj is not None else "exploring")
                 logger.dump_tabular()
             if done:
-                if num_episodes == 10000:
-                    f = open("traj_rewards.txt", 'w')
-                    f.write(str(episode_rewards))
-                    f.close()
-                    IPython.embed()
-
                 if os.path.isfile("signal.txt"):
                     print("detected signal")
                     IPython.embed()
 
+                if n_states_last > 4:
+                    print("too many states")
+                    IPython.embed()
+
                 episode_rewards.append(0.0)
+                if following_traj is None:
+                    evaluation_episode_rewards.append(0.0)
+                    step_scores.append((step, mean_100evalep_reward))
                 All.add((tuple(labels), tuple(rewards)))
 
                 # TODO only add if looking for it (if following_traj == labels: ...)
@@ -296,23 +284,25 @@ def learn(env,
                             if info["TimeLimit.truncated"]:
                                 X_tl.add((tuple(labels), tuple(rewards)))
 
-                        # fixed = make_consistent(noise_epsilon, labels, rewards, X, H)
-                        # if fixed is not None: # we don't try to fix on first few counterexamples
-                        #     X.add((tuple(labels), tuple(rewards)))
-                        #     H = fixed
-                        #     print("FIXEDFIXEDFIXED")
-                        # else:
-                        X_new.add((tuple(labels), tuple(rewards)))
+                        fixed = make_consistent(noise_epsilon, labels, rewards, X_averaged, H)
+                        if fixed is not None: # we don't try to fix on first few counterexamples
+                            X.add((tuple(labels), tuple(rewards)))
+                            following_traj = tuple(labels)
+                            which_one = random.randint(0, len(actions_bank[following_traj])-1)
+                            H = fixed
+                            print("FIXEDFIXEDFIXED")
+                        else:
+                            X_new.add((tuple(labels), tuple(rewards)))
 
                 if following_traj is None and X_new and num_episodes - last_built >= NOISE_UPDATE_X_EVERY_N:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
 
-                    for trace in X_new:
+                    for trace in X.union(X_new):
                         if not enough_in_bank(n_samples, sequences_bank, trace[0]):
                             following_traj = trace[0]
                             which_one = random.randint(0, len(actions_bank[following_traj])-1)
-                    
+
                     if following_traj is None:
                         X.update(X_new)
                         X_new = set()
@@ -336,12 +326,18 @@ def learn(env,
                         transitions = transitions_new
                         Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X)
                         last_built = num_episodes
-            
+                        step_rebuilding.append(step)
+
+
                 if following_traj:
                     following_traj = None
-                    for trace in X_new:
+                    for trace in X.union(X_new):
                         if not enough_in_bank(n_samples, sequences_bank, trace[0]):
                             following_traj = trace[0]
+                            which_one = random.randint(0, len(actions_bank[following_traj])-1)
                             break
                 break
             s = sn
+
+    print("fin")
+    IPython.embed()

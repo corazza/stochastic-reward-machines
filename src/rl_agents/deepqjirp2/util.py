@@ -89,6 +89,17 @@ def split_trace(labels, rewards):
     
     return list(map(lambda x: (tuple(x[0]),tuple(x[1])), new_traces))
 
+def align_trace(labels, rewards):
+    result_labels = list()
+    for i in range(0, len(rewards)):
+        result_labels.append(labels[i])
+        if rewards[i] == 100.0:
+            result_labels[i] = 'k'
+        if rewards[i] == 300.0:
+            result_labels[i] = 'd'
+
+    return (tuple(result_labels), tuple(rewards))
+
 def automaton_reward(current_agent, new_obj_set_in, old_obj_set_in):
     new_detected_obj = list(set(new_obj_set_in) - set(old_obj_set_in))
     if current_agent == '':

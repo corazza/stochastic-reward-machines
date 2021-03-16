@@ -1,6 +1,6 @@
 import copy
 from typing import IO
-
+import os
 import IPython
 
 from rl_agents.jirp.util import run_eqv, rm_run
@@ -77,4 +77,13 @@ def lower(H, language):
             _, rew, _ = H.step(u, l, {})
             if rew > 20:
                 H.move_output(u, l, 0)
-                
+
+def detect_signal(a):
+    if os.path.isfile(f"signals/{a}.txt"):
+        print(f"detected signal signals/{a}.txt")
+        return True
+    return False
+
+def evaluate(env, Q, H, n_episodes):
+    episode_rewards = []
+    
