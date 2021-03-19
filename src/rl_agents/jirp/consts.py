@@ -3,7 +3,7 @@ TERMINAL_STATE = -1
 
 MAX_RM_STATES_N = 50
 UPDATE_X_EVERY_N = 100
-EQV_THRESHOLD = 0.95 # probability threshold for concluding two
+EQV_THRESHOLD = 0.9 # probability threshold for concluding two
                      # states in two different RMs are equivalent
 
 M = 100000.0

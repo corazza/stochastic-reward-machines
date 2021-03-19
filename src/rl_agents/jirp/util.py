@@ -30,10 +30,12 @@ def approximate_hyp(approximation_method, language, transitions, n_states):
     #     last_displayed_states = n_states
     return approximation_method(EXACT_EPSILON, language, n_states, n_states, transitions, empty_transition, report=True, display=True), n_states
 
-def equivalent_on_X(noise_epsilon, eqv_check, H1, v1, H2, v2, X):
+def equivalent_on_X(epsilon, eqv_check, H1, v1, H2, v2, X):
     """
     Checks if state v1 from RM H1 is equivalent to v2 from H2
     """
+    H1_old = H1
+    H2_old = H2
     H1 = H1.with_initial(v1)
     H2 = H2.with_initial(v2)
     total = len(X)
@@ -41,16 +43,32 @@ def equivalent_on_X(noise_epsilon, eqv_check, H1, v1, H2, v2, X):
     for (labels, _rewards) in X:
         output1 = rm_run(labels, H1)
         output2 = rm_run(labels, H2)
-        if eqv_check(noise_epsilon+0.001, output1, output2):
+        if eqv_check(epsilon, output1, output2):
             eqv += 1
-        # if rm_run(labels, H1) == rm_run(labels, H2):
-        #     eqv += 1
-    if float(eqv)/total > EQV_THRESHOLD:
+    if float(eqv)/total >= EQV_THRESHOLD:
         print(f"H_new/{v1} ~ H_old/{v2} (p ~= {float(eqv)/total})")
         return True
     return False
 
-def transfer_Q(noise_epsilon, check_eqv, H_new, H_old, Q_old, X):
+def eqv_score(epsilon, eqv_check, H1, v1, H2, v2, X):
+    """
+    Checks if state v1 from RM H1 is equivalent to v2 from H2
+    """
+    if len(X) == 0:
+        return 0
+        
+    H1 = H1.with_initial(v1)
+    H2 = H2.with_initial(v2)
+    total = len(X)
+    eqv = 0
+    for (labels, _rewards) in X:
+        output1 = rm_run(labels, H1)
+        output2 = rm_run(labels, H2)
+        if eqv_check(epsilon, output1, output2):
+            eqv += 1
+    return float(eqv)/total
+
+def transfer_Q(epsilon, check_eqv, H_new, H_old, Q_old, X):
     """
     Returns new set of q-functions, indexed by states of H_new, where
     some of the q-functions may have been transfered from H_old if the
@@ -61,13 +79,32 @@ def transfer_Q(noise_epsilon, check_eqv, H_new, H_old, Q_old, X):
     """
     Q = dict()
     Q[-1] = dict() # (-1 is the index of the terminal state) (TODO check if necessary)
+    scores = dict()
     for v in H_new.get_states():
-        Q[v] = dict()
-        # find probably equivalent state u in H_old
         for u in H_old.get_states():
-            if equivalent_on_X(noise_epsilon, check_eqv, H_new, v, H_old, u, X) and u in Q_old:
-                Q[v] = copy.deepcopy(Q_old[u])
-                break
+            score = eqv_score(epsilon, check_eqv, H_new, v, H_old, u, X)
+            if score >= EQV_THRESHOLD:
+                if v not in scores:
+                    scores[v] = (u, score)
+                else:
+                    previous_u, previous_score = scores[v]
+                    if score > previous_score:
+                        scores[v] = (u, score)
+
+    for v in H_new.get_states():
+        if v in scores:
+            Q[v] = copy.deepcopy(Q_old[scores[v][0]])
+            print(f"H_new/{v} ~ H_old/{scores[v][0]} (p ~= {scores[v][1]})")
+        else:
+            Q[v] = dict()
+            print(f"H_new/{v} /~ any")
+    # for v in H_new.get_states():
+    #     Q[v] = dict()
+    #     # find probably equivalent state u in H_old
+    #     for u in H_old.get_states():
+    #         if equivalent_on_X(epsilon, check_eqv, H_new, v, H_old, u, X):
+    #             Q[v] = copy.deepcopy(Q_old[u])
+    #             break
     return Q
 
 def rm_run(labels, H):
@@ -137,6 +174,7 @@ def dnf_for_empty(language):
             L.add("!" + str(label))
     return "&".join(L)
 
+# TODO build trie
 def prefixes(X, without_terminal=False):
     yield ((), ()) # (\epsilon, \epsilon) \in Pref(X)
     for (labels, rewards) in X:
@@ -278,6 +316,7 @@ def display_transitions(transitions, name):
     dot.render(f"graphviz/{name}.gv", view=True)
 
 def display_rm(rm, name):
+    from graphviz import Digraph
     dot = Digraph(format='png',comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
 
     nodes = set()

@@ -148,4 +148,5 @@ def common_arg_parser():
     parser.add_argument('--profile_whole', help='Profile whole call to train', type=str, default=None)
     parser.add_argument('--rm_id', help="Use this RM", type=int, default=0)
     parser.add_argument('--no_rm', help="DeepQ/JIRP runs on envs without an explicit underlying RM", action="store_true", default=False)
+    parser.add_argument('--results_path', help='Path to save JIRP results', default=None, type=str)
     return parser

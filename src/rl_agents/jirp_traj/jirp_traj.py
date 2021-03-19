@@ -47,7 +47,7 @@ def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
 def compute_n_samples(epsilon, delta):
     ci = delta/4.0
     sigma = (2*epsilon)**2 / 12
-    return max(50, math.ceil(((Z_CONF * sigma) / ci)**2))
+    return max(20, math.ceil(((Z_CONF * sigma) / ci)**2))
 
 def add_to_bank(actions, labels, rewards, sequences_bank, actions_bank):
     if labels not in sequences_bank:
@@ -105,10 +105,6 @@ def recompute_X(n_samples, noise_delta, X, sequences_bank):
     print("collapsed means", collapsed_means)
     print("group average set", group_average_set)
 
-    if len(group_average_set) > 3:
-        print("TOO MANY AVERAGES")
-        IPython.embed()
-
     X_final = set()
     for (labels, rewards) in X_result:
         rewards_collapsed = list()
@@ -129,24 +125,26 @@ def learn(env,
           gamma=0.9,
           q_init=1.0,
           use_crm=False,
-          use_rs=False):
+          use_rs=False,
+          results_path=None):
     assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
+    assert results_path is not None
 
-    try:
-        noise_epsilon = env.current_rm.epsilon_cont
-    except:
-        noise_epsilon = NOISE_EPSILON
-
-    try:
-        noise_delta = env.current_rm.noise_delta
-        assert noise_delta is not None
-    except:
-        noise_delta = NOISE_DELTA
+    noise_epsilon, noise_delta = extract_noise_params(env)
     
     n_samples = compute_n_samples(noise_epsilon, noise_delta)
     print("alg noise epsilon:", noise_epsilon)
     print("alg noise delta:", noise_delta)
     print(f"need {n_samples} samples for 99% confidence")
+
+    description = { 
+        "env_name": env.unwrapped.spec.id,
+        "alg_name": "jirp_traj",
+        "alg_noise_epsilon": noise_epsilon,
+        "alg_noise_delta": noise_delta,
+        "n_samples": n_samples
+    }
+    results = EvalResults(description)
 
     sequences_bank = dict()
     actions_bank = dict()
@@ -170,8 +168,6 @@ def learn(env,
 
     episode_rewards = [0.0]
     evaluation_episode_rewards = [0.0]
-    step_scores = list()
-    step_rebuilding = list()
     step = 0
     num_episodes = 0
 
@@ -264,14 +260,10 @@ def learn(env,
                     print("detected signal")
                     IPython.embed()
 
-                if n_states_last > 4:
-                    print("too many states")
-                    IPython.embed()
-
                 episode_rewards.append(0.0)
                 if following_traj is None:
                     evaluation_episode_rewards.append(0.0)
-                    step_scores.append((step, mean_100evalep_reward))
+                    results.register_mean_reward(step, mean_100evalep_reward)
                 All.add((tuple(labels), tuple(rewards)))
 
                 # TODO only add if looking for it (if following_traj == labels: ...)
@@ -304,6 +296,7 @@ def learn(env,
                             which_one = random.randint(0, len(actions_bank[following_traj])-1)
 
                     if following_traj is None:
+                        X_old = copy.deepcopy(X)
                         X.update(X_new)
                         X_new = set()
                         X_averaged = recompute_X(n_samples, noise_delta, X, sequences_bank)
@@ -317,17 +310,11 @@ def learn(env,
                         empty_transition = dnf_for_empty(language)
                         transitions_new, n_states_last = consistent_hyp(noise_epsilon, X_averaged, X_tl_averaged, n_states_last)
                         H_new = rm_from_transitions(transitions_new, empty_transition)
-                        # if not consistent_on_all(noise_epsilon, X, H_new):
-                        #     print("NOT CONSISTENT IMMMEDIATELY")
-                        #     IPython.embed()
-                        # H_old = copy.deepcopy(H)
+                        Q = transfer_Q(noise_delta, run_eqv_noise, H_new, H, Q, X_old)
                         H = H_new
-                        # average_on_X(noise_epsilon, H, All, X)
                         transitions = transitions_new
-                        Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X)
                         last_built = num_episodes
-                        step_rebuilding.append(step)
-
+                        results.register_rebuilding(step, n_states_last)
 
                 if following_traj:
                     following_traj = None
@@ -339,5 +326,4 @@ def learn(env,
                 break
             s = sn
 
-    print("fin")
-    IPython.embed()
+    results.save(results_path)

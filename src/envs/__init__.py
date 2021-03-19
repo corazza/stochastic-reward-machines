@@ -75,19 +75,26 @@ for i in range(11):
  # --- GARDEN
 register(
     id='Garden-v0',
-    entry_point='envs.grids.garden_environment:GardenEnv',
+    entry_point='envs.grids.garden_environment:GardenEnvNoSlip',
+    max_episode_steps=250
+)
+
+register(
+    id='GardenS-v0',
+    entry_point='envs.grids.garden_environment:GardenEnvSlip5',
     max_episode_steps=250
 )
 
 # --- MINING
-register(
-    id='MiningT1-v0',
-    entry_point='envs.grids.grid_environment:MiningRMEnvT1',
-    max_episode_steps=1000
-)
 
-register(
-    id='MiningT2-v0',
-    entry_point='envs.grids.grid_environment:MiningRMEnvT2',
-    max_episode_steps=1000
-)
+for i in range(1, 5):
+    register(
+        id=f'MiningT{i}-v0',
+        entry_point=f'envs.grids.grid_environment:MiningRMEnvT{i}',
+        max_episode_steps=1000
+    )
+    register(
+        id=f'MiningST{i}-v0',
+        entry_point=f'envs.grids.grid_environment:MiningRMEnvST{i}',
+        max_episode_steps=1000
+    )

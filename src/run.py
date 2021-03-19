@@ -82,6 +82,8 @@ def train(args, extra_args):
     alg_kwargs['use_rs']   = args.use_rs
     alg_kwargs['use_crm']  = args.use_crm
     alg_kwargs['gamma']    = args.gamma
+    if "results_path" in args:
+        alg_kwargs["results_path"] = args.results_path
 
     print('Training {} on {}:{} with arguments \n{}'.format(args.alg, env_type, env_id, alg_kwargs))
 

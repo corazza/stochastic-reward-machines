@@ -9,10 +9,8 @@ from envs.grids.value_iteration import value_iteration
 from envs.grids.game_objects import *
 import random, math, os
 import numpy as np
-from rl_agents.jirp_noise.consts import NOISE_EPSILON
+from rl_agents.jirp_noise.consts import NOISE_DELTA, NOISE_EPSILON
 
-
-PERTURB_PROB = 0.0
 
 class GardenEnv(gym.Env):
     def __init__(self):
@@ -20,26 +18,22 @@ class GardenEnv(gym.Env):
         self.env_game_over = False
         self.state = 0 # "RM" implementation
         self.harvest = 0 # not hidden so as to not poison other states when doing QRM
-        self.labeled_harvest = False
         self.noise_epsilon = NOISE_EPSILON
+        self.noise_delta = NOISE_DELTA
+        self.slip_prob = None
         N,M      = self.map_height, self.map_width
         self.action_space = spaces.Discrete(4) # up, right, down, left
         self.observation_space = spaces.Box(low=0, high=max([N,M]), shape=(3,), dtype=np.uint8)
         print("garden noise epsilon:", self.noise_epsilon)
 
     def reset(self):
-        self.state = 0 # None, got_seed, sowed, got_water, watered, got_tools, reaped
+        self.state = 0
         self.harvest = 0
-        self.labeled_harvest = False
         self.agent.reset()
         return self.get_features()
 
     def get_events(self, internal=False):
         true_props = self.get_true_propositions()
-        # if self.harvest != 0 and true_props == '': # and not self.labeled_harvest:
-        #     true_props = f"{self.harvest}"
-        #     if not internal:
-        #         self.labeled_harvest = True
         return true_props
 
     def step(self, action):
@@ -50,42 +44,27 @@ class GardenEnv(gym.Env):
         reward = 0
         done = False
 
-        # if label == 'w' and self.state == 0:
-        #     self.state = 1
-        #     reward = 0.1
-        # elif label == 'g' and self.state == 1:
-        #     self.state = 2
-        #     reward = 0.2
-        # elif label == 'h' and self.state == 2:
-        #     self.state = 3
-        #     reward = 0.3
-        #     self.harvest = random.randint(1, 2)
-        # elif label == 'm' and self.state == 3:
-        #     reward = self.harvest*5 + random.uniform(-self.noise_epsilon, self.noise_epsilon)
-        #     done = True
-        # elif label == 'e':
-        #     reward = 0
-        #     done = True
-
-        # HERE
-        # test- it probably doesn't matter if h and g rewards are too close,
-        # because we _can_ find cx where we'd get zero for the wrong order
-
-        if label == 'h' and self.state == 0:
+        if label == 'w' and self.state == 0:
             self.state = 1
-            reward = 1
+            reward = 0.1
         elif label == 'g' and self.state == 1:
             self.state = 2
-            reward = 1
+            reward = 0.1
+        if label == 'h' and self.state == 2:
+            self.state = 3
+            reward = 0.1
+        elif label == 'g' and self.state == 3:
+            self.state = 4
+            reward = 0.1
             if random.random() < 0.01:
                 self.harvest = 2
             else:
                 self.harvest = 1
-        elif label == 'm' and self.state == 2:
+        elif label == 'm' and self.state == 4:
             if self.harvest == 1:
                 reward = 3
             else:
-                reward = 3.5
+                reward = 3 + self.noise_delta
             reward += random.uniform(-self.noise_epsilon, self.noise_epsilon)
             done = True
         elif label == 'e':
@@ -115,7 +94,7 @@ class GardenEnv(gym.Env):
             agent.change_position(ni,nj)
 
     def _perturb_action(self, a):
-        if random.random() < PERTURB_PROB:
+        if random.random() < self.slip_prob:
             return random.randint(0, 3)
         return a
 
@@ -228,3 +207,13 @@ class GardenEnv(gym.Env):
 
     def is_hidden_rm(self):
         return True
+
+class GardenEnvNoSlip(GardenEnv):
+    def __init__(self):
+        super().__init__()
+        self.slip_prob = 0
+
+class GardenEnvSlip5(GardenEnv):
+    def __init__(self):
+        super().__init__()
+        self.slip_prob = 0.05

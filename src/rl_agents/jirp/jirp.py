@@ -71,46 +71,6 @@ def approximate_hyp(approximation_method, language, transitions, n_states):
         last_displayed_states = n_states
     return approximation_method(EXACT_EPSILON, language, n_states, n_states, transitions, empty_transition, report=True, display=True), n_states
 
-def equivalent_on_X(H1, v1, H2, v2, X):
-    """
-    Checks if state v1 from RM H1 is equivalent to v2 from H2
-    """
-    H1 = H1.with_initial(v1)
-    H2 = H2.with_initial(v2)
-    total = len(X)
-    eqv = 0
-    for (labels, _rewards) in X:
-        output1 = rm_run(labels, H1)
-        output2 = rm_run(labels, H2)
-        if run_eqv(EXACT_EPSILON, output1, output2):
-            eqv += 1
-        # if rm_run(labels, H1) == rm_run(labels, H2):
-        #     eqv += 1
-    if float(eqv)/total > EQV_THRESHOLD:
-        print(f"H_new/{v1} ~ H_old/{v2} (p ~= {float(eqv)/total})")
-        return True
-    return False
-
-def transfer_Q(H_new, H_old, Q_old, X = {}):
-    """
-    Returns new set of q-functions, indexed by states of H_new, where
-    some of the q-functions may have been transfered from H_old if the
-    respective states were determined to be equivalent
-    
-    Although the thm. requires the outputs be the same on _all_ label sequences,
-    choosing probably equivalent states may be good enough.
-    """
-    Q = dict()
-    Q[-1] = dict() # (-1 is the index of the terminal state) (TODO check if necessary)
-    for v in H_new.get_states():
-        Q[v] = dict()
-        # find probably equivalent state u in H_old
-        for u in H_old.get_states():
-            if equivalent_on_X(H_new, v, H_old, u, X) and u in Q_old:
-                Q[v] = copy.deepcopy(Q_old[u])
-                break
-    return Q
-
 def learn(env,
           network=None,
           seed=None,
@@ -232,7 +192,7 @@ def learn(env,
                     empty_transition = dnf_for_empty(language)
                     transitions_new, n_states_last = consistent_hyp(X, X_tl, n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
-                    Q = transfer_Q(H_new, H, Q, X)
+                    Q = transfer_Q(EXACT_EPSILON, run_eqv, H_new, H, Q, X)
                     H = H_new
                     transitions = transitions_new
                 break

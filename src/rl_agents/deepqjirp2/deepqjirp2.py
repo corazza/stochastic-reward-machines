@@ -189,22 +189,11 @@ def learn(env,
                 episode_rewards.append(0.0)
 
                 if not run_eqv(EXACT_EPSILON, rm_run(jirp_labels, H), jirp_rewards):
-                    # clean = clean_trace_montezuma(tuple(jirp_labels), tuple(jirp_rewards))
-                    # clean = (tuple(jirp_labels), tuple(jirp_rewards))
-                    # splits = split_trace(clean[0], clean[1])
-                    
-                    
-                    # X_new.add((tuple(jirp_labels), tuple(jirp_rewards)))
-                    X_new.add(align_trace(jirp_labels, jirp_rewards))
-
-
-                    # for (jirp_labelsx, jirp_rewardsx) in splits:
-                    #     if not run_eqv(EXACT_EPSILON, rm_run(jirp_labelsx, H), jirp_rewardsx):
-                    #         X_new.add((jirp_labelsx, jirp_rewardsx))
-                    # if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
-                    #     tl = info["TimeLimit.truncated"]
-                    #     if tl:
-                    #         X_tl.add(splits[-1])
+                    aligned = align_trace(jirp_labels, jirp_rewards)
+                    X_new.add(aligned)
+                    if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
+                        if info["TimeLimit.truncated"]:
+                            X_tl.add(aligned)
 
                 jirp_labels = list()
                 jirp_rewards = list()
@@ -212,13 +201,10 @@ def learn(env,
                 if X_new: # and num_episodes % DEEPQJIRP_UPDATE_X_EVERY_N == 0:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
-                    IPython.embed()
                     X.update(X_new)
                     X_new = set()
                     language = sample_language(X)
                     empty_transition = dnf_for_empty(language)
-                    if len(X) > 100:
-                        IPython.embed()
                     transitions_new, n_states_last = consistent_hyp(X, X_tl, infer_termination=False, n_states_start=n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
                     Q, C = transfer_Q_counters(env, H_new, H, Q, C, X)

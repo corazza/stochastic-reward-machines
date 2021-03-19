@@ -1,6 +1,8 @@
 import copy
 from typing import IO
 import os
+import time
+import json
 import IPython
 
 from rl_agents.jirp.util import run_eqv, rm_run
@@ -64,19 +66,31 @@ def average_on_X(epsilon, H, All, X):
             current_state = next_state
     for statelabel in outputs_dict:
         rewards = outputs_dict[statelabel]
-        average = sum(rewards)/len(rewards)
+        rewards = sorted(rewards)
+        average = (rewards[0] + rewards[-1])/2.0
         H2 = copy.deepcopy(H)
         H2.move_output(statelabel[0], statelabel[1], average)
         if consistent_on_all(epsilon, X, H2):
             H.move_output(statelabel[0], statelabel[1], average)
             print(f"average {statelabel[0]}-{statelabel[1]}: {average}")
 
-def lower(H, language):
-    for u in H.get_states():
-        for l in language:
-            _, rew, _ = H.step(u, l, {})
-            if rew > 20:
-                H.move_output(u, l, 0)
+def extract_noise_params(env):
+    noise_epsilon = None
+    noise_delta = None
+
+    try:
+        noise_epsilon = env.current_rm.epsilon_cont
+        assert noise_epsilon is not None
+    except:
+        noise_epsilon = env.noise_epsilon
+
+    try:
+        noise_delta = env.current_rm.noise_delta
+        assert noise_delta is not None
+    except:
+        noise_delta = env.noise_delta
+    
+    return noise_epsilon, noise_delta
 
 def detect_signal(a):
     if os.path.isfile(f"signals/{a}.txt"):
@@ -84,6 +98,20 @@ def detect_signal(a):
         return True
     return False
 
-def evaluate(env, Q, H, n_episodes):
-    episode_rewards = []
+class EvalResults:
+    def __init__(self, description):
+        self.description = description
+        self.step_rewards = list()
+        self.step_rebuilding = list()
+
+    def register_mean_reward(self, step, reward):
+        self.step_rewards.append((time.time(), step, reward))
     
+    def register_rebuilding(self, step, states):
+        self.step_rebuilding.append((time.time(), step, states))
+    
+    def save(self, filename):
+        data = json.dumps(self.__dict__)
+
+        with open(filename, 'w') as f:
+            f.write(data)

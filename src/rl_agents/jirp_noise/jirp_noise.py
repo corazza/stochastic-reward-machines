@@ -35,7 +35,9 @@ def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
         if report:
             print(f"finding model with {n_states} states")
         # print("(SMT)")
-        new_transitions = smt_noise(noise_epsilon, X, X_tl, n_states)
+        # new_transitions = smt_noise(noise_epsilon, X, X_tl, n_states)
+        new_transitions = smt_noise_cpp(noise_epsilon, X, X_tl, n_states)
+
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
         if new_transitions is not None:
@@ -92,22 +94,24 @@ def learn(env,
           gamma=0.9,
           q_init=1.0,
           use_crm=False,
-          use_rs=False):
+          use_rs=False,
+          results_path=None):
     assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
+    assert results_path is not None
 
-    try:
-        noise_epsilon = env.current_rm.epsilon_cont
-    except:
-        noise_epsilon = NOISE_EPSILON
-
-    try:
-        noise_delta = env.current_rm.noise_delta
-        assert noise_delta is not None
-    except:
-        noise_delta = NOISE_DELTA
+    noise_epsilon, noise_delta = extract_noise_params(env)
     
     print("alg noise epsilon:", noise_epsilon)
     print("alg noise delta:", noise_delta)
+
+    description = { 
+        "env_name": env.unwrapped.spec.id,
+        "alg_name": "jirp_noise",
+        "alg_noise_epsilon": noise_epsilon,
+        "alg_noise_delta": noise_delta,
+    }
+
+    results = EvalResults(description)
 
     X = set()
     All = set()
@@ -127,8 +131,6 @@ def learn(env,
 
     episode_rewards = [0.0]
     step = 0
-    step_scores = list()
-    step_rebuilding = list()
     num_episodes = 0
 
     while step < total_timesteps:
@@ -182,8 +184,9 @@ def learn(env,
             num_episodes = len(episode_rewards)
             mean_100ep_reward = np.mean(episode_rewards[-101:-1])
 
-            if step%5000 == 0:
-                step_scores.append((step, mean_100ep_reward))
+            if step%1000 == 0:
+                # step_scores.append((step, mean_100ep_reward))
+                results.register_mean_reward(step, mean_100ep_reward)
 
             if step%print_freq == 0:
                 logger.record_tabular("steps", step)
@@ -219,6 +222,7 @@ def learn(env,
                     print(f"len(X_new)={len(X_new)}")
                     if detect_signal("xnew"):
                         IPython.embed()
+                    X_old = copy.deepcopy(X)
                     X.update(X_new)
                     X_new = set()
                     language = sample_language(X)
@@ -228,14 +232,12 @@ def learn(env,
                     if not consistent_on_all(noise_epsilon, X, H_new):
                         print("NOT CONSISTENT IMMMEDIATELY")
                         IPython.embed()
-                    H_old = copy.deepcopy(H)
+                    average_on_X(noise_epsilon, H_new, All, X)
+                    Q = transfer_Q(noise_delta, run_eqv_noise, H_new, H, Q, X_old)
                     H = H_new
-                    average_on_X(noise_epsilon, H, All, X)
                     transitions = transitions_new
-                    Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X)
-                    step_rebuilding.append(step)
+                    results.register_rebuilding(step, n_states_last)
                 break
             s = sn
 
-    print("fin")
-    IPython.embed()
+    results.save(results_path)
