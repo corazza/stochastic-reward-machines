@@ -81,7 +81,8 @@ def learn(env,
           gamma=0.9,
           q_init=1.0,
           use_crm=False,
-          use_rs=False):
+          use_rs=False,
+          results_path=None):
     assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
 
     reward_total = 0
@@ -171,8 +172,10 @@ def learn(env,
                 logger.record_tabular("len(X_new)", len(X_new))
                 logger.dump_tabular()
             if done:
-                if step > 1e6 and do_embed:
+                if os.path.isfile("signal.txt"):
+                    print("detected signal")
                     IPython.embed()
+                    
                 num_episodes = len(episode_rewards)
                 episode_rewards.append(0.0)
 
@@ -186,11 +189,13 @@ def learn(env,
                 if X_new and num_episodes % UPDATE_X_EVERY_N == 0:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
+                    if len(X) > 200:
+                        IPython.embed()
                     X.update(X_new)
                     X_new = set()
                     language = sample_language(X)
                     empty_transition = dnf_for_empty(language)
-                    transitions_new, n_states_last = consistent_hyp(X, X_tl, n_states_last)
+                    transitions_new, n_states_last = consistent_hyp(X, X_tl, infer_termination=True, n_states_start=n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
                     Q = transfer_Q(EXACT_EPSILON, run_eqv, H_new, H, Q, X)
                     H = H_new

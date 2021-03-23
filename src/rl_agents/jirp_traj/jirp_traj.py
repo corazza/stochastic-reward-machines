@@ -43,9 +43,8 @@ def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
 
     raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
 
-
 def compute_n_samples(epsilon, delta):
-    ci = delta/4.0
+    ci = delta/(2*4.0)
     sigma = (2*epsilon)**2 / 12
     return max(20, math.ceil(((Z_CONF * sigma) / ci)**2))
 
@@ -142,7 +141,8 @@ def learn(env,
         "alg_name": "jirp_traj",
         "alg_noise_epsilon": noise_epsilon,
         "alg_noise_delta": noise_delta,
-        "n_samples": n_samples
+        "n_samples": n_samples,
+        "total_timesteps": total_timesteps
     }
     results = EvalResults(description)
 
@@ -310,11 +310,11 @@ def learn(env,
                         empty_transition = dnf_for_empty(language)
                         transitions_new, n_states_last = consistent_hyp(noise_epsilon, X_averaged, X_tl_averaged, n_states_last)
                         H_new = rm_from_transitions(transitions_new, empty_transition)
-                        Q = transfer_Q(noise_delta, run_eqv_noise, H_new, H, Q, X_old)
+                        Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X_old)
                         H = H_new
                         transitions = transitions_new
                         last_built = num_episodes
-                        results.register_rebuilding(step, n_states_last)
+                        results.register_rebuilding(step, list(transitions.items()))
 
                 if following_traj:
                     following_traj = None

@@ -287,7 +287,6 @@ bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, i
     std::cout << "getting model" << std::endl;
     model m = s.get_model();
     std::cout << "got model" << std::endl;
-
     
     json transitions;
 
@@ -295,7 +294,10 @@ bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, i
         if (m.eval(val).is_true()) {
             auto o_key = o_dict_key(key.first.first, key.first.second);
             auto o = m.eval(o_dict.at(o_key));
-            float out = (double) o.numerator().get_numeral_int64() / (double) o.denominator().get_numeral_int64();
+            float out = 0.0;
+            if (o.is_numeral()){
+                out = (double) o.numerator().get_numeral_int64() / (double) o.denominator().get_numeral_int64();
+            }
             json transition;
             transition.push_back(key.first.first);
             transition.push_back(key.first.second);

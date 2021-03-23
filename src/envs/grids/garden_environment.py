@@ -44,30 +44,57 @@ class GardenEnv(gym.Env):
         reward = 0
         done = False
 
-        if label == 'w' and self.state == 0:
+        # if label == 'w' and self.state == 0:
+        #     self.state = 1
+        #     # reward = 0.1
+        # elif label == 'g' and self.state == 1:
+        #     self.state = 2
+        #     # reward = 0.1
+        # elif label == 'h' and self.state == 2:
+        #     self.state = 3
+        #     # reward = 0.1
+        # elif label == 'g' and self.state == 3:
+        #     self.state = 4
+        #     # reward = 0.1
+        #     if random.random() < 0.5:
+        #         self.harvest = 2
+        #     else:
+        #         self.harvest = 1
+        # elif label == 'm' and self.state == 4:
+        #     if self.harvest == 1:
+        #         reward = 3
+        #     else:
+        #         reward = 3 + self.noise_delta
+        #     # reward += random.uniform(-self.noise_epsilon, self.noise_epsilon)
+        #     done = True
+        # elif label == 'e':
+        #     reward = 0
+        #     done = True
+
+        if 'w' in label and self.state == 0:
             self.state = 1
-            reward = 0.1
-        elif label == 'g' and self.state == 1:
+            reward = 0.21 # 0 \in M, so if 0.2 \in M and eps_c=0.1 then {0, 0.2} \subseteq [0.1-eps_c, 0.1+eps_c]=[0, 0.2] which breaks assumption (1)
+        elif 'g' in label and self.state == 1:
             self.state = 2
-            reward = 0.1
-        if label == 'h' and self.state == 2:
+            reward = 0.21
+        elif 'h' in label and self.state == 2:
             self.state = 3
-            reward = 0.1
-        elif label == 'g' and self.state == 3:
+            reward = 0.21
+        elif 'g' in label and self.state == 3:
             self.state = 4
-            reward = 0.1
-            if random.random() < 0.01:
+            reward = 0.21
+            if random.random() < 0.5:
                 self.harvest = 2
             else:
                 self.harvest = 1
-        elif label == 'm' and self.state == 4:
+        elif 'm' in label and self.state == 4:
             if self.harvest == 1:
                 reward = 3
             else:
                 reward = 3 + self.noise_delta
             reward += random.uniform(-self.noise_epsilon, self.noise_epsilon)
             done = True
-        elif label == 'e':
+        elif 'e' in label:
             reward = 0
             done = True
 
@@ -117,7 +144,7 @@ class GardenEnv(gym.Env):
         """
         Returns the string with the propositions that are True in this state
         """
-        ret = str(self.map_array[self.agent.i][self.agent.j]).strip()
+        ret = str(self.map_array[self.agent.i][self.agent.j]).strip() + str(self.harvest)
         if ret == 'z':
             ret = str(self.harvest)
         return ret

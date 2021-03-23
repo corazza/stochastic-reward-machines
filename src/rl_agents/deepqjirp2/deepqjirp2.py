@@ -37,7 +37,7 @@ def transfer_Q_counters(env, H_new, H_old, Q_old, C_old, X):
         C[v] = None
         # find probably equivalent state u in H_old
         for u in H_old.get_states():
-            if equivalent_on_X(H_new, v, H_old, u, X):
+            if equivalent_on_X(EXACT_EPSILON, run_eqv, H_new, v, H_old, u, X):
                 Q[v] = Q_old[u]
                 C[v] = C_old[u]
                 break

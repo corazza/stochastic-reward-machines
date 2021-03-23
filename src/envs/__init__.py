@@ -98,3 +98,9 @@ for i in range(1, 5):
         entry_point=f'envs.grids.grid_environment:MiningRMEnvST{i}',
         max_episode_steps=1000
     )
+
+register(
+    id=f'MiningT5-v0',
+    entry_point='envs.grids.grid_environment:MiningRMEnvT5',
+    max_episode_steps=1000
+)

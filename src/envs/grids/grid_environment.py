@@ -287,6 +287,13 @@ class MiningRMEnvT4(GridRMEnv):
         env = CraftWorld(file_map, slip_chance=0.00)
         super().__init__(GridEnv(env), rm_files)
 
+class MiningRMEnvT5(GridRMEnv):
+    def __init__(self):
+        rm_files = ["./envs/grids/reward_machines/mine/t5.txt"]
+        file_map = "./envs/grids/maps/map_13.txt"
+        env = CraftWorld(file_map, slip_chance=0.00)
+        super().__init__(GridEnv(env), rm_files)
+
 
 # positive slip-chance
 
@@ -294,26 +301,26 @@ class MiningRMEnvST1(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t1.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.01)
+        env = CraftWorld(file_map, slip_chance=0.0001)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvST2(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t2.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.01)
+        env = CraftWorld(file_map, slip_chance=0.0001)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvST3(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t3.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.01)
+        env = CraftWorld(file_map, slip_chance=0.0001)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvST4(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t4.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.01)
+        env = CraftWorld(file_map, slip_chance=0.0001)
         super().__init__(GridEnv(env), rm_files)

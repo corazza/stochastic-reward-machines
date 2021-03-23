@@ -54,7 +54,7 @@ def make_consistent(epsilon, labels, rewards, X, H):
 def average_on_X(epsilon, H, All, X):
     outputs_dict = dict()
     for (labels, rewards) in All:
-        if len(rm_run(labels, H)) != len(rewards):
+        if not run_eqv_noise(epsilon, rm_run(labels, H), rewards):
             continue
         current_state = H.reset()
         for i in range(0, len(labels)):
@@ -73,6 +73,9 @@ def average_on_X(epsilon, H, All, X):
         if consistent_on_all(epsilon, X, H2):
             H.move_output(statelabel[0], statelabel[1], average)
             print(f"average {statelabel[0]}-{statelabel[1]}: {average}")
+        else:
+            print(f"inconsistent average {statelabel[0]}-{statelabel[1]}: {average}")
+
 
 def extract_noise_params(env):
     noise_epsilon = None
@@ -107,8 +110,8 @@ class EvalResults:
     def register_mean_reward(self, step, reward):
         self.step_rewards.append((time.time(), step, reward))
     
-    def register_rebuilding(self, step, states):
-        self.step_rebuilding.append((time.time(), step, states))
+    def register_rebuilding(self, step, rm):
+        self.step_rebuilding.append((time.time(), step, rm))
     
     def save(self, filename):
         data = json.dumps(self.__dict__)

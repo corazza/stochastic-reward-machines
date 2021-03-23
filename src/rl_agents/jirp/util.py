@@ -51,12 +51,9 @@ def equivalent_on_X(epsilon, eqv_check, H1, v1, H2, v2, X):
     return False
 
 def eqv_score(epsilon, eqv_check, H1, v1, H2, v2, X):
-    """
-    Checks if state v1 from RM H1 is equivalent to v2 from H2
-    """
     if len(X) == 0:
         return 0
-        
+
     H1 = H1.with_initial(v1)
     H2 = H2.with_initial(v2)
     total = len(X)
@@ -98,13 +95,6 @@ def transfer_Q(epsilon, check_eqv, H_new, H_old, Q_old, X):
         else:
             Q[v] = dict()
             print(f"H_new/{v} /~ any")
-    # for v in H_new.get_states():
-    #     Q[v] = dict()
-    #     # find probably equivalent state u in H_old
-    #     for u in H_old.get_states():
-    #         if equivalent_on_X(epsilon, check_eqv, H_new, v, H_old, u, X):
-    #             Q[v] = copy.deepcopy(Q_old[u])
-    #             break
     return Q
 
 def rm_run(labels, H):
@@ -228,10 +218,20 @@ def add_pvar(storage, storage_rev, used_pvars, subscript):
 def rm_from_transitions(transitions, empty_transition):
     delta_u = defaultdict(dict)
     delta_r = defaultdict(dict)
+    chars = set()
+    for char in empty_transition:
+        if char.isalnum():
+            chars.add(char)
 
     for (p, l) in transitions:
         (q, r) = transitions[(p, l)]
-        conj = "&".join(l) or empty_transition
+        conj = []
+        for char in chars:
+            if char in l:
+                conj.append(char)
+            else:
+                conj.append(f"!{char}")
+        conj = "&".join(conj)
         if q not in delta_u[p]:
             delta_u[p][q] = conj
         else:
@@ -318,19 +318,22 @@ def display_transitions(transitions, name):
 def display_rm(rm, name):
     from graphviz import Digraph
     dot = Digraph(format='png',comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
-
     nodes = set()
-
     dot.node("-1")
     for p in rm.U:
         dot.node(str(p))
-
     for p in rm.U:
         for q in rm.delta_u[p]:
-            dot.edge(str(p),str(q),label=f"({rm.delta_u[p][q]},{rm.delta_r[p][q]})")
-        
+            dot.edge(str(p),str(q),label=f"({rm.delta_u[p][q]}, {rm.delta_r[p][q]})")        
     dot = dot.unflatten()
     dot.render(f"graphviz/{name}.gv", view=True)
+
+def serializeable_rm(rm):
+    transitions = dict()
+    for p in rm.U:
+        for q in rm.delta_u[p]:
+            transitions[f"{p}-{q}"] = f"({rm.delta_u[p][q]}, {rm.delta_r[p][q]})"
+    return transitions
 
 def isomorphic(t1, t2, n_states):
     for bij in itertools.permutations(range(1, n_states+1)):

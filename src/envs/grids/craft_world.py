@@ -3,7 +3,6 @@ import random, math, os
 import numpy as np
 
 class CraftWorld:
-
     def __init__(self, file_map, slip_chance=0.0):
         self.file_map = file_map
         self._load_map(file_map)
