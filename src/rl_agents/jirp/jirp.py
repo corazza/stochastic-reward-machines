@@ -23,7 +23,7 @@ from rl_agents.jirp.sat_hyp import sat_hyp
 last_displayed_states = 0
 
 # @profile(sort="tottime")
-def consistent_hyp(X, X_tl, infer_termination=True, n_states_start=2, report=True):
+def consistent_hyp(X, X_tl, infer_termination, n_states_start=2, report=True):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
     and its number of states
@@ -83,7 +83,14 @@ def learn(env,
           use_crm=False,
           use_rs=False,
           results_path=None):
-    assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
+    assert env.no_rm() or env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
+
+    infer_termination = TERMINATION
+    try:
+        infer_termination = env.infer_termination_preference()
+    except:
+        pass
+    print(f"(alg) INFERRING TERMINATION: {infer_termination}")
 
     reward_total = 0
     total_episodes = 0
@@ -98,7 +105,7 @@ def learn(env,
     rewards = []
     do_embed = True
 
-    transitions, n_states_last = consistent_hyp(set(), set())
+    transitions, n_states_last = consistent_hyp(set(), set(), infer_termination)
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     H = rm_from_transitions(transitions, empty_transition)
@@ -151,7 +158,7 @@ def learn(env,
                 else:    _delta = h_r + gamma*get_qmax(Q[v_next], sn, actions, q_init) - Q[v][s][a]
                 Q[v][s][a] += lr*_delta
 
-            if not rm_done or not TERMINATION:
+            if not rm_done or not infer_termination:
                 rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
             else:
                 next_random = True
@@ -195,10 +202,11 @@ def learn(env,
                     X_new = set()
                     language = sample_language(X)
                     empty_transition = dnf_for_empty(language)
-                    transitions_new, n_states_last = consistent_hyp(X, X_tl, infer_termination=True, n_states_start=n_states_last)
+                    transitions_new, n_states_last = consistent_hyp(X, X_tl, infer_termination, n_states_start=n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
                     Q = transfer_Q(EXACT_EPSILON, run_eqv, H_new, H, Q, X)
                     H = H_new
                     transitions = transitions_new
                 break
             s = sn
+    IPython.embed()

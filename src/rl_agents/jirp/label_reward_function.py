@@ -2,6 +2,17 @@ from reward_machines.reward_functions import RewardFunction
 from rl_agents.jirp.dnf_compile import compile_dnf, evaluate_dnf_compiled
 import random
 
+def for_display(dnf):
+    result = ""
+    skip_next = False
+    for i in range(0, len(dnf)):
+        if dnf[i] == '!':
+            skip_next = True
+        elif dnf[i].isalnum() and not skip_next:
+            result += dnf[i]
+        else:
+            skip_next = False
+    return result
 
 class LabelRewardFunction(RewardFunction):
     """
@@ -37,10 +48,10 @@ class LabelRewardFunction(RewardFunction):
                 return
 
     def __str__(self):
-        return str(self.label_rewards)
+        return str(dict(map(lambda x: (for_display(x[0]), x[1]), self.label_rewards.items())))
 
     def __repr__(self):
-        return str(self.label_rewards)
+        return str(dict(map(lambda x: (for_display(x[0]), x[1]), self.label_rewards.items())))
 
 # (3,5,'f|n',LabelRewardFunction({"f": 1.05, "n": 0.0}))
 

@@ -3,7 +3,6 @@ import random, math, os
 import numpy as np
 
 class GardenWorld:
-
     def __init__(self, file_map):
         self.file_map = file_map
         self._load_map(file_map)

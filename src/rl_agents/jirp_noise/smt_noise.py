@@ -1,4 +1,5 @@
 from z3 import *
+import IPython
 
 from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
@@ -7,22 +8,23 @@ from rl_agents.jirp.util import *
 
 
 class Exporter:
-    def __init__(self, epsilon, X, X_tl, n_states, language, empty_transition):
+    def __init__(self, epsilon, X, X_tl, n_states, language, empty_transition, infer_termination):
         self.epsilon = epsilon
         self.X = list(X)
         self.X_tl = list(X_tl)
         self.n_states = n_states
         self.language = list(language)
         self.empty_transition = empty_transition
+        self.infer_termination = infer_termination
         # self.reward_alphabet = list(reward_alphabet)
 
 # TODO termination inference
-def smt_noise_cpp(epsilon, X, X_tl, n_states, report=True, inspect=False, display=False):
+def smt_noise_cpp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=False, display=False):
     import json, sys, os
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
-    exporter = Exporter(epsilon, X, X_tl, n_states, language, empty_transition)
+    exporter = Exporter(epsilon, X, X_tl, n_states, language, empty_transition, infer_termination)
 
     filename="tmp.json"
     data = json.dumps(exporter.__dict__)
@@ -44,7 +46,7 @@ def smt_noise_cpp(epsilon, X, X_tl, n_states, report=True, inspect=False, displa
         return transitions
 
 
-def smt_noise(epsilon, X, X_tl, n_states, report=True, inspect=False, display=False):
+def smt_noise(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=False, display=False):
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
@@ -114,7 +116,7 @@ def smt_noise(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fa
                 s.add(Implies(And(x_1, d), x_2))
 
     # (Termination)
-    if TERMINATION:
+    if infer_termination:
         for (labels, _rewards) in prefixes(X, without_terminal=True):
             if labels == ():
                 continue
@@ -165,7 +167,7 @@ def smt_noise(epsilon, X, X_tl, n_states, report=True, inspect=False, display=Fa
         model = s.model()
         stransitions = dict()
         for (p, a, q) in d_dict:
-            if (p == TERMINAL_STATE or q == TERMINAL_STATE) and not TERMINATION:
+            if (p == TERMINAL_STATE or q == TERMINAL_STATE) and not infer_termination:
                 continue
             if is_true(model[d_dict[(p, a, q)]]):
                 o = model[o_dict[(p, a)]]

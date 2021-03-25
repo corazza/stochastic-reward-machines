@@ -24,7 +24,6 @@ typedef std::string XDictKey;
 
 const int INITIAL_STATE = 0;
 const int TERMINAL_STATE = -1;
-const bool TERMINATION = true;
 
 struct HashableTrace {
     Trace trace;
@@ -147,12 +146,12 @@ std::vector<HashableTrace> prefixes(std::vector<Trace>& X) {
 }
 
 
-bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, int n_states, Language language, std::string empty_transition, json *results) {
+bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, int n_states, bool infer_termination, Language language, std::string empty_transition, json *results) {
     std::vector<int> states;
     for (int i = 0; i < n_states; ++i) {
         states.push_back(i);
     }
-    if (TERMINATION) {
+    if (infer_termination) {
         states.push_back(TERMINAL_STATE);
     }
 
@@ -237,7 +236,7 @@ bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, i
         }
     }
 
-    if (TERMINATION) {
+    if (infer_termination) {
         for (auto const& h_trace : x_prefixes) {
             if (h_trace.trace.first.size() == 0) {
                 continue;
@@ -330,7 +329,7 @@ int main() {
     }
 
     json transitions;
-    bool result = smt_noise(j["epsilon"], X, X_tl, j["n_states"], language, j["empty_transition"], &transitions);
+    bool result = smt_noise(j["epsilon"], X, X_tl, j["n_states"], j["infer_termination"], language, j["empty_transition"], &transitions);
 
     std::ofstream o("tmp_out.json");
     if (result) {

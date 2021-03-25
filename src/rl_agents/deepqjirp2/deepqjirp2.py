@@ -87,6 +87,14 @@ def learn(env,
 
     assert not use_crm
 
+    infer_termination = TERMINATION
+    try:
+        infer_termination = env.infer_termination_preference()
+    except:
+        pass
+    print(f"(alg) INFERRING TERMINATION: {infer_termination}")
+
+
     observation_space = env.observation_space
     episode_rewards = [0.0]
     saved_mean_reward = None
@@ -99,7 +107,7 @@ def learn(env,
     jirp_rewards = []
     next_random = False
 
-    transitions, n_states_last = consistent_hyp(set(), set(), infer_termination=False)
+    transitions, n_states_last = consistent_hyp(set(), set(), infer_termination)
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     H = rm_from_transitions(transitions, empty_transition)
@@ -157,7 +165,7 @@ def learn(env,
                 C[p] += 1
 
             obs = new_obs
-            if not rm_done or not TERMINATION:
+            if not rm_done or not infer_termination:
                 rm_state = next_rm_state # TODO FIXME this entire loop, comment and organize
             else:
                 next_random = True
@@ -205,7 +213,7 @@ def learn(env,
                     X_new = set()
                     language = sample_language(X)
                     empty_transition = dnf_for_empty(language)
-                    transitions_new, n_states_last = consistent_hyp(X, X_tl, infer_termination=False, n_states_start=n_states_last)
+                    transitions_new, n_states_last = consistent_hyp(X, X_tl, infer_termination, n_states_start=n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
                     Q, C = transfer_Q_counters(env, H_new, H, Q, C, X)
                     H = H_new

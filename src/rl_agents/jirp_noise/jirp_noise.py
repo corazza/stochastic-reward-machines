@@ -18,7 +18,7 @@ from rl_agents.jirp.consts import *
 from rl_agents.jirp_noise.consts import *
 from rl_agents.jirp_noise.smt_noise import *
 
-def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
+def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, report=True):
     """
     Finds a reward machine consistent with counterexample set X. Returns the RM
     and its number of states
@@ -36,7 +36,7 @@ def consistent_hyp(noise_epsilon, X, X_tl, n_states_start=2, report=True):
             print(f"finding model with {n_states} states")
         # print("(SMT)")
         # new_transitions = smt_noise(noise_epsilon, X, X_tl, n_states)
-        new_transitions = smt_noise_cpp(noise_epsilon, X, X_tl, n_states)
+        new_transitions = smt_noise_cpp(noise_epsilon, X, X_tl, n_states, infer_termination)
 
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
@@ -96,8 +96,15 @@ def learn(env,
           use_crm=False,
           use_rs=False,
           results_path=None):
-    assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
+    assert env.no_rm() or env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
     assert results_path is not None
+
+    infer_termination = TERMINATION
+    try:
+        infer_termination = env.infer_termination_preference()
+    except:
+        pass
+    print(f"(alg) INFERRING TERMINATION: {infer_termination}")
 
     noise_epsilon, noise_delta = extract_noise_params(env)
     
@@ -122,7 +129,7 @@ def learn(env,
     labels = []
     rewards = []
 
-    transitions, n_states_last = consistent_hyp(noise_epsilon, set(), set())
+    transitions, n_states_last = consistent_hyp(noise_epsilon, set(), set(), infer_termination)
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     H = rm_from_transitions(transitions, empty_transition)
@@ -170,7 +177,7 @@ def learn(env,
                 else:    _delta = h_r + gamma*get_qmax(Q[v_next], sn, actions, q_init) - Q[v][s][a]
                 Q[v][s][a] += lr*_delta
 
-            if not rm_done or not TERMINATION:
+            if not rm_done or not infer_termination:
                 rm_state = next_rm_state
             else:
                 next_random = True
@@ -228,7 +235,7 @@ def learn(env,
                     X_new = set()
                     language = sample_language(X)
                     empty_transition = dnf_for_empty(language)
-                    transitions_new, n_states_last = consistent_hyp(noise_epsilon, X, X_tl, n_states_last)
+                    transitions_new, n_states_last = consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
                     if not consistent_on_all(noise_epsilon, X, H_new):
                         print("NOT CONSISTENT IMMMEDIATELY")
@@ -240,5 +247,5 @@ def learn(env,
                     results.register_rebuilding(step, serializeable_rm(H))
                 break
             s = sn
-
+    IPython.embed()
     results.save(results_path)

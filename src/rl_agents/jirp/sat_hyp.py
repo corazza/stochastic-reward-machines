@@ -37,11 +37,11 @@ def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=
 
     # Encoding reward machines
     # (1)
-    for p in all_states_here(n_states):
+    for p in all_states_here(n_states, infer_termination):
         for l in language:
-            g.add_clause([add_pvar_d((p, l, q)) for q in all_states_here(n_states)])
-            for q1 in all_states_here(n_states):
-                for q2 in all_states_here(n_states):
+            g.add_clause([add_pvar_d((p, l, q)) for q in all_states_here(n_states, infer_termination)])
+            for q1 in all_states_here(n_states, infer_termination):
+                for q2 in all_states_here(n_states, infer_termination):
                     if q1==q2:
                         continue
                     p_l_q1 = add_pvar_d((p, l, q1))
@@ -49,7 +49,7 @@ def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=
                     g.add_clause([-p_l_q1, -p_l_q2])
 
     # (2)
-    for p in all_states_here(n_states):
+    for p in all_states_here(n_states, infer_termination):
         for l in language:
             g.add_clause([add_pvar_o((p, l, r)) for r in reward_alphabet])
             for r1 in reward_alphabet:
@@ -63,7 +63,7 @@ def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=
     # Consistency with sample
     # (3)
     g.add_clause([add_pvar_x((tuple(), INITIAL_STATE))]) # starts in the initial state
-    for p in all_states_here(n_states):
+    for p in all_states_here(n_states, infer_termination):
         if p == INITIAL_STATE:
             continue
         g.add_clause([-add_pvar_x((tuple(), p))])
@@ -74,8 +74,8 @@ def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=
             continue
         lm = labels[0:-1]
         l = labels[-1]
-        for p in all_states_here(n_states):
-            for q in all_states_here(n_states):
+        for p in all_states_here(n_states, infer_termination):
+            for q in all_states_here(n_states, infer_termination):
                 x_1 = add_pvar_x((lm, p))
                 d = add_pvar_d((p, l, q))
                 x_2 = add_pvar_x((labels, q))
@@ -88,7 +88,7 @@ def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=
         lm = labels[0:-1]
         l = labels[-1]
         r = rewards[-1]
-        for p in all_states_here(n_states):
+        for p in all_states_here(n_states, infer_termination):
             x = add_pvar_x((lm, p))
             o = add_pvar_o((p, l, r))
             g.add_clause([-x, o])
@@ -101,7 +101,7 @@ def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=
             lm = labels[0:-1]
             l = labels[-1]
             x_2 = add_pvar_x((labels, TERMINAL_STATE)) # TODO REMOVE unneeded
-            for p in all_states_here(n_states):
+            for p in all_states_here(n_states, infer_termination):
                 if p == TERMINAL_STATE:
                     continue
                 x_1 = add_pvar_x((lm, p))
@@ -114,7 +114,7 @@ def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=
             lm = labels[0:-1]
             l = labels[-1]
             x_2 = add_pvar_x((labels, TERMINAL_STATE)) # TODO REMOVE unneeded
-            for p in all_states_here(n_states):
+            for p in all_states_here(n_states, infer_termination):
                 if p == TERMINAL_STATE:
                     continue
                 x_1 = add_pvar_x((lm, p))
@@ -122,14 +122,14 @@ def sat_hyp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=
                 d_t = -d if (labels, rewards) in X_tl else d
                 g.add_clause([-x_1, d_t])
 
-        for p in all_states_here(n_states):
+        for p in all_states_here(n_states, infer_termination):
             if p == TERMINAL_STATE:
                 continue
             for l in language:
                 d = add_pvar_d((TERMINAL_STATE, l, p))
                 g.add_clause([-d])
 
-        for p in all_states_here(n_states):
+        for p in all_states_here(n_states, infer_termination):
             for l in language:
                 o = add_pvar_o((TERMINAL_STATE, l, 0.0))
                 g.add_clause([o])

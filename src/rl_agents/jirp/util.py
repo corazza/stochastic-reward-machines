@@ -317,14 +317,15 @@ def display_transitions(transitions, name):
 
 def display_rm(rm, name):
     from graphviz import Digraph
-    dot = Digraph(format='png',comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
+    dot = Digraph(format='pdf',comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
     nodes = set()
     dot.node("-1")
     for p in rm.U:
         dot.node(str(p))
     for p in rm.U:
         for q in rm.delta_u[p]:
-            dot.edge(str(p),str(q),label=f"({rm.delta_u[p][q]}, {rm.delta_r[p][q]})")        
+            dot.edge(str(p),str(q),label=f"({rm.delta_r[p][q]})")        
+            # dot.edge(str(p),str(q),label=f"({rm.delta_u[p][q]}, {rm.delta_r[p][q]})")        
     dot = dot.unflatten()
     dot.render(f"graphviz/{name}.gv", view=True)
 
@@ -344,8 +345,8 @@ def isomorphic(t1, t2, n_states):
             return True
     return False
 
-def all_states_here(asdf):
-    if TERMINATION:
+def all_states_here(asdf, infer_termination):
+    if infer_termination:
         return all_states_terminal(asdf)
     else:
         return all_states(asdf)

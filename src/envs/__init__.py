@@ -72,10 +72,16 @@ for i in range(11):
         max_episode_steps=1000
     )
 
- # --- GARDEN
+ # --- GARDEN / HARVESTING
 register(
     id='Garden-v0',
     entry_point='envs.grids.garden_environment:GardenEnvNoSlip',
+    max_episode_steps=250
+)
+
+register(
+    id='Harvest-v0',
+    entry_point='envs.grids.harvest_environment:HarvestEnv',
     max_episode_steps=250
 )
 
