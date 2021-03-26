@@ -185,7 +185,6 @@ def learn(env,
 
     while step < total_timesteps:
         s = tuple(env.reset())
-        true_props = env.get_events()
         rm_state = H.reset()
         done_actions_list = []
         labels = []

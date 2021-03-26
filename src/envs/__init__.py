@@ -81,7 +81,7 @@ register(
 
 register(
     id='Harvest-v0',
-    entry_point='envs.grids.harvest_environment:HarvestEnv',
+    entry_point='envs.grids.harvest_environment:HarvestRMEnv',
     max_episode_steps=250
 )
 
