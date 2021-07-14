@@ -145,6 +145,9 @@ class RewardMachineHidden(gym.Wrapper):
     def get_num_rm_states(self):
         return self.env.num_rm_states
 
+    def no_rm(self):
+        return False
+
     def is_hidden_rm(self):
         return True
 

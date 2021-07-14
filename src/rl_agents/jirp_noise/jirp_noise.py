@@ -96,6 +96,7 @@ def learn(env,
           use_crm=False,
           use_rs=False,
           results_path=None):
+    # IPython.embed()
     assert env.no_rm() or env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
     assert results_path is not None
 
@@ -238,7 +239,7 @@ def learn(env,
                     transitions_new, n_states_last = consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_last)
                     H_new = rm_from_transitions(transitions_new, empty_transition)
                     if not consistent_on_all(noise_epsilon, X, H_new):
-                        print("NOT CONSISTENT IMMMEDIATELY")
+                        print("NOT CONSISTENT IMMEDIATELY")
                         IPython.embed()
                     average_on_X(noise_epsilon, H_new, All, X)
                     Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X_old)
