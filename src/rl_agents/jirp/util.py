@@ -172,6 +172,14 @@ def prefixes(X, without_terminal=False):
         for i in range(1, len(labels) + ending):
             yield (labels[0:i], rewards[0:i])
 
+def prefixes_trace(trace, without_terminal=False):
+    labels = trace[0]
+    rewards = trace[1]
+    yield ((), ())
+    ending = 1 if not without_terminal else 0
+    for i in range(1, len(labels) + ending):
+        yield (labels[0:i], rewards[0:i])
+
 def all_pairs(xs):
     xs = list(xs)
     for i in range(0, len(xs)):

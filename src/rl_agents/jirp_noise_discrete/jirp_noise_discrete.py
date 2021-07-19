@@ -19,54 +19,30 @@ from rl_agents.jirp.smt_approx import smt_approx
 from rl_agents.jirp.smt_hyp import smt_hyp
 from rl_agents.jirp.mip_hyp import mip_hyp
 from rl_agents.jirp.sat_hyp import sat_hyp
+from rl_agents.jirp_noise.util import EvalResults
 
 
 last_displayed_states = 0
 
-# @profile(sort="tottime")
-def consistent_hyp(X, X_tl, infer_termination, n_states_start=2, report=True):
+def discrete_noise_hyp(X, X_tl, infer_termination, discrete_noise_p, n_states_start=2, report=True):
     """
-    Finds a reward machine consistent with counterexample set X. Returns the RM
-    and its number of states
-
-    n_states_start makes the search start from machines with that number of states.
-    Used to optimize succeeding search calls.
+    Returns set of corrupted traces to be removed later
     """
     if len(X) == 0:
         transitions = dict()
         transitions[(0, tuple())] = [0, 0.0]
-        return transitions, 1
-    # TODO intercept empty X here
+        return transitions, 1, set()
     for n_states in range(n_states_start, MAX_RM_STATES_N+1):
         if report:
             print(f"finding model with {n_states} states")
-        new_transitions = sat_hyp(0.0, X, X_tl, n_states, infer_termination) # epsilon does nothing in sat_hyp
-        if new_transitions is not None:
-            # if new_transitions_sat is None:
-            #     print(f"SAT couldn't find anything with n_states={n_states}")
-            # display_transitions(new_transitions, "st")
-            return new_transitions, n_states
+        result = maxsat_hyp(0.0, X, X_tl, n_states, infer_termination) # epsilon does nothing in maxsat_hyp
+        if result is not None:
+            new_transitions, corrupted_traces = result
+            cost = float(len(corrupted_traces))/float(len(X))
+            # if cost <= discrete_noise_p:
+            return new_transitions, n_states, corrupted_traces
         continue
     raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
-
-def approximate_hyp(approximation_method, language, transitions, n_states):
-    empty_transition = dnf_for_empty(language)
-    if n_states >= 2:
-        for i in range(2, n_states):
-            minimized_rm = approximation_method(MINIMIZATION_EPSILON, language, i, n_states, transitions, empty_transition, report=True)
-            if minimized_rm:
-                print(f"FOUND MINIMIZED RM {i} < {n_states}")
-                print(transitions)
-                print(minimized_rm)
-                return minimized_rm, n_states
-    print("couldn't find minimized RM, returning exact")
-
-    display = False
-    global last_displayed_states
-    if n_states > last_displayed_states or n_states <= 2:
-        display = True
-        last_displayed_states = n_states
-    return approximation_method(EXACT_EPSILON, language, n_states, n_states, transitions, empty_transition, report=True, display=True), n_states
 
 def learn(env,
           network=None,
@@ -82,6 +58,12 @@ def learn(env,
           results_path=None):
     assert env.no_rm() or env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
 
+    try:
+        discrete_noise_p = env.discrete_noise_p
+    except:
+        discrete_noise_p = 0
+    assert discrete_noise_p >= 0
+
     infer_termination = TERMINATION
     try:
         infer_termination = env.infer_termination_preference()
@@ -89,12 +71,24 @@ def learn(env,
         pass
     print(f"(alg) INFERRING TERMINATION: {infer_termination}")
 
+    description = { 
+        "env_name": env.unwrapped.spec.id,
+        "alg_name": "jirp_noise_discrete",
+        "discrete_noise_p": discrete_noise_p,
+        "reward_flip_p": REWARD_FLIP_P,
+        "total_timesteps": total_timesteps,
+    }
+
+    results = EvalResults(description)
+
     reward_total = 0
     total_episodes = 0
     step = 0
     num_episodes = 0
     episode_rewards = [0.0]
 
+    A = set()
+    A_tl = set()
     X = set()
     X_new = set()
     X_tl = set()
@@ -102,7 +96,7 @@ def learn(env,
     rewards = []
     do_embed = True
 
-    transitions, n_states_last = consistent_hyp(set(), set(), infer_termination)
+    transitions, n_states_last, _corrupted_traces = discrete_noise_hyp(set(), set(), infer_termination, discrete_noise_p)
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     H = rm_from_transitions(transitions, empty_transition)
@@ -183,23 +177,31 @@ def learn(env,
                 num_episodes = len(episode_rewards)
                 episode_rewards.append(0.0)
 
+                time_limited = False
+                if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
+                    time_limited = info["TimeLimit.truncated"]
+
+                trace = (tuple(labels), tuple(rewards))
+                # A.add(trace)
+                # if time_limited:
+                #     A_tl.add(trace)
                 if not run_eqv(EXACT_EPSILON, rm_run(labels, H), rewards):
-                    X_new.add((tuple(labels), tuple(rewards)))
-                    if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
-                        tl = info["TimeLimit.truncated"]
-                        if tl:
-                            X_tl.add((tuple(labels), tuple(rewards)))
+                    X_new.add(trace)
+                    if time_limited:
+                        X_tl.add(trace)
 
                 if X_new and num_episodes % UPDATE_X_EVERY_N == 0:
                     print(f"len(X)={len(X)}")
                     print(f"len(X_new)={len(X_new)}")
-                    # if len(X) > 200:
-                    #     IPython.embed()
                     X.update(X_new)
                     X_new = set()
                     language = sample_language(X)
                     empty_transition = dnf_for_empty(language)
-                    transitions_new, n_states_last = consistent_hyp(X, X_tl, infer_termination, n_states_start=n_states_last)
+                    transitions_new, n_states_last, corrupted_traces = discrete_noise_hyp(X, X_tl, infer_termination, discrete_noise_p, n_states_start=n_states_last)
+                    before_removal_n = len(X)
+                    X -= corrupted_traces
+                    after_removal_n = len(X)
+                    print(f"removed {before_removal_n-after_removal_n}/{before_removal_n} corrupted traces")
                     H_new = rm_from_transitions(transitions_new, empty_transition)
                     Q = transfer_Q(EXACT_EPSILON, run_eqv, H_new, H, Q, X)
                     H = H_new
@@ -207,5 +209,4 @@ def learn(env,
                 break
             s = sn
 
-    print("+++FINISHED")
-    IPython.embed()
+    results.save(results_path)

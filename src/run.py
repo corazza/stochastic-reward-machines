@@ -108,7 +108,7 @@ def build_env(args):
 
     env_type, env_id = get_env_type(args)
 
-    if alg in ['deepq', 'qlearning', 'jirp', 'deepqjirp', 'deepqjirp2', 'jirp_noise', 'jirp_traj', 'hrm', 'dhrm']:
+    if alg in ['deepq', 'qlearning', 'jirp', 'deepqjirp', 'deepqjirp2', 'jirp_noise', 'jirp_noise_discrete', 'jirp_traj', 'hrm', 'dhrm']:
         env = make_env(env_id, env_type, args, seed=seed, logger_dir=logger.get_dir())
     else:
         config = tf.ConfigProto(allow_soft_placement=True,

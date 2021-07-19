@@ -1,7 +1,7 @@
 import gym, random
 from gym import spaces
 import numpy as np
-from reward_machines.rm_environment import RewardMachineEnv
+from reward_machines.rm_environment import RewardMachineDiscreteNoise, RewardMachineEnv
 from envs.grids.craft_world import CraftWorld
 from envs.grids.office_world import OfficeWorld
 from envs.grids.value_iteration import value_iteration
@@ -125,6 +125,12 @@ class OfficeRM3Env(GridRMEnv):
         rm_files = ["./envs/grids/reward_machines/office/t3.txt"]
         env = OfficeWorld()
         super().__init__(GridEnv(env),rm_files)
+
+# class OfficeRM3EnvDiscreteNoise(GridRMEnv):
+#     def __init__(self):
+#         rm_files = ["./envs/grids/reward_machines/office/t3.txt"]
+#         env = OfficeWorld()
+#         super().__init__(RewardMachineDiscreteNoise(GridEnv(env), 0.1),rm_files)
 
 class OfficeNoisyRM3Env(GridRMEnv):
     def __init__(self):

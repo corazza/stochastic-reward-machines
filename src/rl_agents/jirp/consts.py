@@ -16,3 +16,5 @@ NOISE = 0.1
 TERMINATION = True
 X_PRUNE_MIN_SIZE = 3
 X_PRUNE_MAX = 0
+
+REWARD_FLIP_P = 0.1 # (In a corrupted trace) probability of flipping a reward

@@ -15,9 +15,11 @@ import gym
 from gym import spaces
 import numpy as np
 import IPython
+import random
 
 from reward_machines.reward_machine import RewardMachine
 from rl_agents.deepqjirp2.util import atari_underneath
+from rl_agents.jirp.consts import REWARD_FLIP_P
 
 
 class RewardMachineEnv(gym.Wrapper):
@@ -149,6 +151,7 @@ class RewardMachineHidden(gym.Wrapper):
         return False
 
     def is_hidden_rm(self):
+
         return True
 
     def hidden_obs(self, obs):
@@ -170,6 +173,29 @@ class RewardMachineHidden(gym.Wrapper):
             self.env.env.current_rm    = self.reward_machines[self.current_rm_id]
             self.env.env.current_u_id  = self.current_rm.reset()
 
+class RewardMachineDiscreteNoise(gym.Wrapper):
+    def __init__(self, env, p):
+        """
+        With probability p, the reward is flipped (assumes binary rewards)
+        """
+        self.discrete_noise_p = p
+        self.current_corrupted = None
+        self.corruption_counter = 0
+        super().__init__(env)
+
+    def reset(self):
+        self.current_corrupted = random.random() < self.discrete_noise_p
+        self.corruption_counter += 1 if self.current_corrupted else 0
+        return self.env.reset()
+
+    def step(self, action):
+        next_obs, rm_rew, done, info = self.env.step(action)
+        if rm_rew not in [0, 1]:
+            raise ValueError("rewards should be binary when using discrete noise")
+        if random.random() < REWARD_FLIP_P and self.current_corrupted:
+            rm_rew = random.randint(0, 1)
+            info["discrete_noise"] = True
+        return next_obs, rm_rew, done, info
 
 class RewardMachineWrapper(gym.Wrapper):
     def __init__(self, env, add_crm, add_rs, gamma, rs_gamma):
