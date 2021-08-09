@@ -323,7 +323,7 @@ def display_transitions(transitions, name):
     dot = dot.unflatten()
     dot.render(f"graphviz/{name}.gv", view=True)
 
-def display_rm(rm, name):
+def display_rm(rm, name, view=True):
     from graphviz import Digraph
     dot = Digraph(format='pdf',comment=name, graph_attr={"fontsize":"6.0"}, edge_attr={"color": "#000000aa"})
     nodes = set()
@@ -335,7 +335,7 @@ def display_rm(rm, name):
             dot.edge(str(p),str(q),label=f"({rm.delta_r[p][q]})")        
             # dot.edge(str(p),str(q),label=f"({rm.delta_u[p][q]}, {rm.delta_r[p][q]})")        
     dot = dot.unflatten()
-    dot.render(f"graphviz/{name}.gv", view=True)
+    dot.render(f"graphviz/{name}.gv", view=view)
 
 def serializeable_rm(rm):
     transitions = dict()

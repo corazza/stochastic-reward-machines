@@ -17,4 +17,8 @@ TERMINATION = True
 X_PRUNE_MIN_SIZE = 3
 X_PRUNE_MAX = 0
 
-REWARD_FLIP_P = 0.1 # (In a corrupted trace) probability of flipping a reward
+DISCRETE_NOISE_P = 0.02 # Probability that an episode will be corrupted
+REWARD_FLIP_P = 0.2 # (In a corrupted trace) probability of flipping a reward
+UPDATE_X_EVERY_N_DISCRETE_NOISE = 1000
+
+REGISTER_MEAN_REWARD_EVERY_N_STEP = 1000

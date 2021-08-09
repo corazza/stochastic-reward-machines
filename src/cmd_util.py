@@ -98,8 +98,8 @@ def make_env(env_id, env_type, args, mpi_rank=0, subrank=0, seed=None, reward_sc
         assert not args.no_rm
         env = RewardMachineHidden(env, args.gamma, args.rs_gamma, args.rm_id)
 
-    if args.discrete_noise_p > 0:
-        env = RewardMachineDiscreteNoise(env, args.discrete_noise_p)
+    if args.discrete_noise:
+        env = RewardMachineDiscreteNoise(env)
 
     if flatten_dict_observations and isinstance(env.observation_space, gym.spaces.Dict):
         env = FlattenObservation(env)
@@ -149,7 +149,7 @@ def common_arg_parser():
     parser.add_argument("--use_self_loops", help="Add option policies for self-loops in the RMs", action="store_true", default=False)
     # JIRP
     parser.add_argument("--rm_hidden", help="Hide RM observations", action="store_true", default=False)
-    parser.add_argument('--discrete_noise_p', help="Probability of a discretely corrupted trace", type=float, default=0.0)
+    parser.add_argument("--discrete_noise", help="Wrapper for discrete noise envs", action="store_true", default=False)
     parser.add_argument('--profile_whole', help='Profile whole call to train', type=str, default=None)
     parser.add_argument('--rm_id', help="Use this RM", type=int, default=0)
     parser.add_argument('--no_rm', help="DeepQ/JIRP runs on envs without an explicit underlying RM", action="store_true", default=False)
