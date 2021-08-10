@@ -52,6 +52,6 @@ with open(results_path) as f:
     plt.ylabel("mean 100ep reward")
     plt.xlabel("steps")
     for x in steps_rebuilding:
-        plt.axvline(x, color="red")
+        plt.axvline(x, color="red", linewidth=0.8, linestyle=':')
     plt.title(title)
     plt.show()
