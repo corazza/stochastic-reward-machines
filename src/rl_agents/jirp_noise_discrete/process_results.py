@@ -1,4 +1,5 @@
 import sys
+import IPython
 import matplotlib.pyplot as plt
 import json
 import IPython

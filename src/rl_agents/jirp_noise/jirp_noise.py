@@ -193,8 +193,7 @@ def learn(env,
             num_episodes = len(episode_rewards)
             mean_100ep_reward = np.mean(episode_rewards[-101:-1])
 
-            if step%1000 == 0:
-                # step_scores.append((step, mean_100ep_reward))
+            if step % REGISTER_MEAN_REWARD_EVERY_N_STEP == 0:
                 results.register_mean_reward(step, mean_100ep_reward)
 
             if step%print_freq == 0:

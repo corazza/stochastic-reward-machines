@@ -19,6 +19,7 @@ from rl_agents.jirp.smt_approx import smt_approx
 from rl_agents.jirp.smt_hyp import smt_hyp
 from rl_agents.jirp.mip_hyp import mip_hyp
 from rl_agents.jirp.sat_hyp import sat_hyp
+from rl_agents.jirp_noise.util import EvalResults
 
 
 last_displayed_states = 0
@@ -88,6 +89,16 @@ def learn(env,
     except:
         pass
     print(f"(alg) INFERRING TERMINATION: {infer_termination}")
+
+
+    description = { 
+        "env_name": env.unwrapped.spec.id,
+        "alg_name": "jirp",
+        "reward_flip_p": REWARD_FLIP_P,
+        "total_timesteps": total_timesteps,
+    }
+
+    results = EvalResults(description)
 
     reward_total = 0
     total_episodes = 0
@@ -166,9 +177,13 @@ def learn(env,
             step += 1
             episode_rewards[-1] += r
 
+            num_episodes = len(episode_rewards)
+            mean_100ep_reward = np.mean(episode_rewards[-101:-1])
+
+            if step % REGISTER_MEAN_REWARD_EVERY_N_STEP == 0:
+                results.register_mean_reward(step, mean_100ep_reward)
+
             if step%print_freq == 0:
-                mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
-                num_episodes = len(episode_rewards)
                 logger.record_tabular("steps", step)
                 logger.record_tabular("episodes", num_episodes)
                 logger.record_tabular("mean 100 episode reward", mean_100ep_reward)
@@ -204,8 +219,7 @@ def learn(env,
                     Q = transfer_Q(EXACT_EPSILON, run_eqv, H_new, H, Q, X)
                     H = H_new
                     transitions = transitions_new
+                    results.register_rebuilding(step, serializeable_rm(H))
                 break
             s = sn
-
-    print("+++FINISHED")
-    IPython.embed()
+    results.save(results_path)
