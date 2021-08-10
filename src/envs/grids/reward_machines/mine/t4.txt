@@ -1,4 +1,4 @@
-0 # initial state || gold - g, silver - a, trap -f
+0 # initial state || d - equipment, g - platinum, a - gold, c - diamond, h - delivery location, f - traps
 [1] # terminal state
 (0,0,'!d&!f',ConstantRewardFunction(0))
 (0,2,'d&!f',ConstantRewardFunction(0))

@@ -106,12 +106,20 @@ class EvalResults:
         self.description = description
         self.step_rewards = list()
         self.step_rebuilding = list()
+        self.step_corrupted = list()
+        self.step_corrupted_end = list()
 
     def register_mean_reward(self, step, reward):
         self.step_rewards.append((time.time(), step, reward))
     
     def register_rebuilding(self, step, rm):
         self.step_rebuilding.append((time.time(), step, rm))
+
+    def register_corruption(self, step):
+        self.step_corrupted.append(step)
+    
+    def register_corruption_end(self, step):
+        self.step_corrupted_end.append(step)
     
     def save(self, filename):
         data = json.dumps(self.__dict__)
