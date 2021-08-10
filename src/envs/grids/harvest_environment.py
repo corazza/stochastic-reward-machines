@@ -61,4 +61,5 @@ class HarvestEnv(gym.Env):
 class HarvestRMEnv(RewardMachineEnv):
     def __init__(self):
         env = HarvestEnv()
+        self.slip_prob = 0.00
         super().__init__(env, ['./envs/grids/reward_machines/harvest/t1.txt'])

@@ -118,6 +118,7 @@ def learn(env,
         "alg_noise_epsilon": noise_epsilon,
         "alg_noise_delta": noise_delta,
         "total_timesteps": total_timesteps,
+        "slip_prob": env.slip_prob
     }
 
     results = EvalResults(description)

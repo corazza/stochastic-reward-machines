@@ -3,11 +3,11 @@ import random, math, os
 import numpy as np
 
 class CraftWorld:
-    def __init__(self, file_map, slip_chance=0.0):
+    def __init__(self, file_map, slip_prob=0.0):
         self.file_map = file_map
         self._load_map(file_map)
         self.env_game_over = False
-        self.slip_chance = slip_chance
+        self.slip_prob = slip_prob
 
     def reset(self):
         self.agent.reset()
@@ -31,7 +31,7 @@ class CraftWorld:
             agent.change_position(ni,nj)
 
     def _perturb_action(self, a):
-        if random.random() < self.slip_chance:
+        if random.random() < self.slip_prob:
             return random.randint(0, 3)
         return a
 

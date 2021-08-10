@@ -12,6 +12,8 @@ import numpy as np
 from rl_agents.jirp_noise.consts import NOISE_DELTA, NOISE_EPSILON
 
 
+# NOT USED
+
 class GardenEnv(gym.Env):
     def __init__(self):
         self._load_map("./envs/grids/maps/map_12.txt")
