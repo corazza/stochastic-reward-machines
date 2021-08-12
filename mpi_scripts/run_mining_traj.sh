@@ -1,12 +1,6 @@
 #!/bin/bash
-exp_name="mining_jirp_traj"
-today=`date '+%Y_%m_%d__%H_%M_%S'`
-hourly=`date '+%Y_%m_%d__%H'`
-outer_results="../mpi_results/${hourly}"
-results_dir="${outer_results}/${exp_name}_${today}"
-
-mkdir -p $outer_results
-mkdir $results_dir
+envalg_name="mining_jirp_traj"
+. ./env.sh ${1}
 
 cd ../src
 for i in `seq 1 4`; 
