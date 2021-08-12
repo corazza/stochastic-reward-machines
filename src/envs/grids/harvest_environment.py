@@ -58,7 +58,26 @@ class HarvestEnv(gym.Env):
     # def get_model(self):
     #     return self.env.get_model()
 
-class HarvestRMEnv(RewardMachineEnv):
+class HarvestRMEnv1(RewardMachineEnv):
     def __init__(self):
         env = HarvestEnv()
+        self.slip_prob = 0.00
         super().__init__(env, ['./envs/grids/reward_machines/harvest/t1.txt'])
+
+class HarvestRMEnv2(RewardMachineEnv):
+    def __init__(self):
+        env = HarvestEnv()
+        self.slip_prob = 0.00
+        super().__init__(env, ['./envs/grids/reward_machines/harvest/t2.txt'])
+
+class HarvestRMEnv3(RewardMachineEnv):
+    def __init__(self):
+        env = HarvestEnv()
+        self.slip_prob = 0.00
+        super().__init__(env, ['./envs/grids/reward_machines/harvest/t3.txt'])
+
+class HarvestRMEnv4(RewardMachineEnv):
+    def __init__(self):
+        env = HarvestEnv()
+        self.slip_prob = 0.00
+        super().__init__(env, ['./envs/grids/reward_machines/harvest/t4.txt'])

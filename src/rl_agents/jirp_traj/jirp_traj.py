@@ -31,7 +31,7 @@ def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, 
         if report:
             print(f"finding model with {n_states} states")
         # print("(SMT)")
-        new_transitions = sat_hyp(noise_epsilon, X, X_tl, infer_termination, n_states)
+        new_transitions = sat_hyp(noise_epsilon, X, X_tl, n_states, infer_termination)
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
         if new_transitions is not None:

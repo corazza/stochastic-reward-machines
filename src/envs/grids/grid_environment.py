@@ -269,35 +269,40 @@ class MiningRMEnvT1(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t1.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.00)
+        self.slip_prob = 0.00 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvT2(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t2.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.00)
+        self.slip_prob = 0.00 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvT3(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t3.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.00)
+        self.slip_prob = 0.00 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvT4(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t4.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.00)
+        self.slip_prob = 0.00 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvT5(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t5.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.00)
+        self.slip_prob = 0.00 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
         super().__init__(GridEnv(env), rm_files)
 
 
@@ -307,26 +312,30 @@ class MiningRMEnvST1(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t1.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.0001)
+        self.slip_prob = 0.0001 # just for propagating
+        env = CraftWorld(file_map, slip_prob=0.0001)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvST2(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t2.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.0001)
+        self.slip_prob = 0.0001 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvST3(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t3.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.0001)
+        self.slip_prob = 0.0001 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
         super().__init__(GridEnv(env), rm_files)
 
 class MiningRMEnvST4(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/t4.txt"]
         file_map = "./envs/grids/maps/map_13.txt"
-        env = CraftWorld(file_map, slip_chance=0.0001)
+        self.slip_prob = 0.0001 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
         super().__init__(GridEnv(env), rm_files)
