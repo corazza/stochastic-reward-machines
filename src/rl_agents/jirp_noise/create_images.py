@@ -2,6 +2,10 @@ import sys, os
 import matplotlib.pyplot as plt
 import json
 
+DPI=600
+scale=1.5
+FIG_SIZE=(6.4*scale, 4.8*scale)
+
 results_path = sys.argv[1]
 
 # jirp_noise
