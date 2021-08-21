@@ -91,7 +91,7 @@ for i in range(1, 5):
     register(
         id=f'Harvest{i}-v0',
         entry_point=f'envs.grids.harvest_environment:HarvestRMEnv{i}',
-        max_episode_steps=250
+        max_episode_steps=50
     )
 
 # --- MINING
