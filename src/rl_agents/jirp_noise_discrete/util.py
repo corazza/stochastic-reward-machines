@@ -54,8 +54,8 @@ def make_consistent(epsilon, labels, rewards, X, H):
 def average_on_X(epsilon, H, All, X):
     outputs_dict = dict()
     for (labels, rewards) in All:
-        if not run_eqv_noise(epsilon, rm_run(labels, H), rewards):
-            continue
+        # if not run_eqv_noise(epsilon, rm_run(labels, H), rewards):
+        #     continue
         current_state = H.reset()
         for i in range(0, len(labels)):
             props = labels[i]
@@ -74,6 +74,7 @@ def average_on_X(epsilon, H, All, X):
             H.move_output(statelabel[0], statelabel[1], average)
             print(f"average {statelabel[0]}-{statelabel[1]}: {average}")
         else:
+            IPython.embed() 
             print(f"inconsistent average {statelabel[0]}-{statelabel[1]}: {average}")
 
 

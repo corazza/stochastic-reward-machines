@@ -72,26 +72,13 @@ for i in range(11):
         max_episode_steps=1000
     )
 
- # --- GARDEN / HARVESTING
-
-# TODO Garden no longer used, remove
-register(
-    id='Garden-v0',
-    entry_point='envs.grids.garden_environment:GardenEnvNoSlip',
-    max_episode_steps=250
-)
-
-register(
-    id='GardenS-v0',
-    entry_point='envs.grids.garden_environment:GardenEnvSlip5',
-    max_episode_steps=250
-)
+ # --- HARVEST
 
 for i in range(1, 5):
     register(
         id=f'Harvest{i}-v0',
         entry_point=f'envs.grids.harvest_environment:HarvestRMEnv{i}',
-        max_episode_steps=250
+        max_episode_steps=50
     )
 
 # --- MINING
