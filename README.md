@@ -7,3 +7,13 @@ To run the experiments go in the `mpi_scripts/` directory and run the appropriat
 3. For Mining environment with JIRP: `./run_mining_jirp.sh EXPERIMENT_NAME`
 
 Etc.
+
+## Results processing
+
+We have a tool for parsing experiment results and producing png, pgf, or tex files. `cd` into `src/` directory and run:
+
+```bash
+python rl_agents/jirp_noise/create_images.py ../mpi_results/EXPERIMENT_NAME tex
+```
+
+Where "tex" can be replaced with "png" or "pgf" as desired.
