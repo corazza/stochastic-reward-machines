@@ -109,6 +109,22 @@ class EvalResults:
         self.step_corrupted = list()
         self.step_corrupted_end = list()
 
+    def from_object(obj):
+        new_results = EvalResults(obj.description)
+        new_results.step_rewards = obj.step_rewards
+        new_results.step_rebuilding = obj.step_rebuilding
+        new_results.step_corrupted = obj.step_corrupted
+        new_results.step_corrupted_end = obj.step_corrupted_end
+        return new_results
+
+    def filter_horizon(self, horizon):
+        new_results = EvalResults(copy.deepcopy(self.description))
+        new_results.step_rewards = list(filter(lambda x: x[1] <= horizon, self.step_rewards))
+        new_results.step_rebuilding = list(filter(lambda x: x[1] <= horizon, self.step_rebuilding))
+        new_results.step_corrupted = list(filter(lambda x: x <= horizon, self.step_corrupted))
+        new_results.step_corrupted_end = list(filter(lambda x: x <= horizon, self.step_corrupted_end))            
+        return new_results
+
     def register_mean_reward(self, step, reward):
         self.step_rewards.append((time.time(), step, reward))
     
