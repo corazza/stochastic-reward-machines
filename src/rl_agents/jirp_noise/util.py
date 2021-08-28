@@ -113,7 +113,7 @@ class EvalResults:
         self.step_rewards.append((time.time(), step, reward))
     
     def register_rebuilding(self, step, rm):
-        self.step_rebuilding.append((time.time(), step, rm))
+        self.step_rebuilding.append((time.time(), step, {}))
 
     def register_corruption(self, step):
         self.step_corrupted.append(step)

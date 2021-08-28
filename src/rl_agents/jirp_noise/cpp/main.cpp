@@ -312,9 +312,13 @@ bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, i
     return true;
 }
 
-int main() {
-    std::cout << "SMT executable started" << std::endl;
-    
+void log(int argc, const char *asdf) {
+    std::cout << asdf << std::endl;
+}
+
+int main(int argc, char *argv[]) {
+    log(argc, "SMT executable started");
+
     std::ifstream i("tmp.json");
     json j;
     i >> j;
