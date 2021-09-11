@@ -9,17 +9,6 @@ import random
 import numpy as np
 from os import walk
 
-# matplotlib.use("pgf")
-# matplotlib.rcParams.update({
-#     "pgf.texsystem": "xelatex",
-#     'font.family': 'serif',
-#     'text.usetex': True,
-#     'pgf.rcfonts': False,
-# })
-
-# from rl_agents.jirp_noise.util import EvalResults
-
-title=f"Mining (no noise)"
 # DPI=600
 # scale=1
 # FIG_SIZE=(6.4*scale, 4.8*scale)
@@ -35,7 +24,7 @@ if len(sys.argv) >= 4:
 if len(sys.argv) >= 5:
     results_paths.append(sys.argv[4])
 
-example_result_is = [random.randint(0, 5), random.randint(0, 5), random.randint(0, 9)]
+example_result_is = [0, 0, 0]
 colors = ["blue", "green", "red"]
 labels = ["main", "baseline", "JIRP"]
 print(f"example_result_is: {example_result_is}")
@@ -134,7 +123,7 @@ else:
 
 plt.ylabel("mean 100ep reward")
 plt.xlabel("steps")
-plt.title(title)
+# plt.title(title)
 
 for i in range(0, len(to_plot)):
     (steps, mean_rewards, lows, mids, highs, steps_rebuilding) = to_plot[i]
@@ -143,7 +132,6 @@ for i in range(0, len(to_plot)):
     # for x in steps_rebuilding:
     #     plt.axvline(x, color=colors[i], linewidth=0.8, linestyle=':')
 
-# if results_path_2 is not None:
 plt.legend(loc="lower right")
 
 if action=="save":
