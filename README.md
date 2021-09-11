@@ -18,7 +18,10 @@ We provide a full list of dependencies in `./environment.yml`.
 
 ## Running experiments
 
-We provide two scripts in the `./scripts/` directory: `run_parallel.sh` runs 10 experiments in parallel and `run_sequential.sh` which runs 10 experiments sequentially one by one.
+We provide two scripts in the `./scripts/` directory:
+
+- `run_parallel.sh` (runs 10 experiments in parallel)
+- `run_sequential.sh` (runs 10 experiments one-by-one)
 
 E.g. for 10 runs of S-JIRP on the Mining environment:
 
@@ -29,16 +32,16 @@ cd scripts
 
 The first argument (`mining` in the above example) is one of:
 
- - `mining` (regular Mining)
- - `harvest` (regular Harvest)
- - `mining_ns` (non-stochastic version of Mining)
- - `harvest_ns` (non-stochastic version of Harvest)
+- `mining` (regular Mining)
+- `harvest` (regular Harvest)
+- `mining_ns` (non-stochastic version of Mining)
+- `harvest_ns` (non-stochastic version of Harvest)
 
 The second argument (`sjirp` in the above example) is one of:
 
- - `sjirp` (S-JIRP)
- - `baseline` (the baseline algorithm)
- - `jirp` (non-stochastic JIRP)
+- `sjirp` (S-JIRP)
+- `baseline` (the baseline algorithm)
+- `jirp` (non-stochastic JIRP)
 
 Results are saved in the `results/EXPERIMENT_ALGORITHM/DATE` directory (which will be created).
 
