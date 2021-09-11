@@ -150,4 +150,5 @@ src/tmp_out.json
 a.out
 a2.out
 a3.out
-src/rl_agents/jirp_noise/cpp/a.out
+src/rl_agents/sjirp/cpp/a.out
+*tmp.json

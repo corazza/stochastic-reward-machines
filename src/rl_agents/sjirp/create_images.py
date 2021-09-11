@@ -15,7 +15,7 @@ matplotlib.rcParams.update({
     'pgf.rcfonts': False,
 })
 
-# from rl_agents.jirp_noise.util import EvalResults
+# from rl_agents.sjirp.util import EvalResults
 
 DPI=100
 scale=0.1
@@ -26,19 +26,19 @@ PLOT_POINTS=1000
 results_path = sys.argv[1]
 file_type = sys.argv[2]
 
-# jirp_noise
+# sjirp
 # description = { 
 #     "env_name": env.unwrapped.spec.id,
-#     "alg_name": "jirp_noise",
+#     "alg_name": "sjirp",
 #     "alg_noise_epsilon": noise_epsilon,
 #     "alg_noise_delta": noise_delta,
 #     "total_timesteps": total_timesteps,
 # }
 
-# jirp_traj
+# baseline
 # description = { 
 #     "env_name": env.unwrapped.spec.id,
-#     "alg_name": "jirp_traj",
+#     "alg_name": "baseline",
 #     "alg_noise_epsilon": noise_epsilon,
 #     "alg_noise_delta": noise_delta,
 #     "n_samples": n_samples,
@@ -75,7 +75,7 @@ for root, dirs, files in os.walk(results_path, topdown=False):
             noise_delta = desc.alg_noise_delta
             title=f"{env_name}"
             # title = f"{alg_name} | {env_name} (epsilon={noise_epsilon}"
-            # if alg_name == 'jirp_traj':
+            # if alg_name == 'baseline':
             #     n_samples = desc['n_samples']
             #     title += f", delta={noise_delta}, n_samples={n_samples})"
             # else:

@@ -9,7 +9,7 @@ from envs.grids.value_iteration import value_iteration
 from envs.grids.game_objects import *
 import random, math, os
 import numpy as np
-from rl_agents.jirp_noise.consts import NOISE_DELTA, NOISE_EPSILON
+from rl_agents.sjirp.consts import NOISE_DELTA, NOISE_EPSILON
 
 
 # NOT USED

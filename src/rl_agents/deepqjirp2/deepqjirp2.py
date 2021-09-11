@@ -24,7 +24,7 @@ from baselines import logger
 from rl_agents.deepqjirp2.util import *
 from rl_agents.deepqjirp2.consts import *
 from rl_agents.jirp.util import *
-from rl_agents.jirp_noise.util import detect_signal
+from rl_agents.sjirp.util import detect_signal
 from rl_agents.jirp.consts import *
 from rl_agents.jirp.jirp import consistent_hyp, equivalent_on_X
 
