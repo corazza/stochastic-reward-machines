@@ -10,10 +10,10 @@ import os.path
 from rl_agents.jirp.sat_hyp import sat_hyp
 
 from rl_agents.jirp.util import *
-from rl_agents.jirp_noise.util import *
+from rl_agents.sjirp.util import *
 from rl_agents.jirp.consts import *
-from rl_agents.jirp_noise.consts import NOISE_UPDATE_X_EVERY_N
-from rl_agents.jirp_noise.smt_noise import smt_noise_cpp
+from rl_agents.sjirp.consts import NOISE_UPDATE_X_EVERY_N
+from rl_agents.sjirp.smt_noise import smt_noise_cpp
 
 
 def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, report=True, alg_name=None, seed=None):
@@ -61,7 +61,7 @@ def learn(env,
           use_rs=False,
           results_path=None):
     ALG_NAME="jirp"
-    REPORT=True
+    REPORT=False
     set_global_seeds(seed)
     print(f"set_global_seeds({seed})")
     assert env.no_rm() or env.is_hidden_rm() # JIRP doesn't work with explicit RM environments

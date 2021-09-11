@@ -306,7 +306,7 @@ class MiningRMEnvT5(GridRMEnv):
         super().__init__(GridEnv(env), rm_files)
 
 
-# Non-noisy, but for jirp_noise
+# Non-noisy, but for sjirp
 class MiningRMEnvT6(GridRMEnv):
     def __init__(self):
         rm_files = ["./envs/grids/reward_machines/mine/nonnoisy3.txt"]

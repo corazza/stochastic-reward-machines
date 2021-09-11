@@ -35,9 +35,9 @@ def smt_noise_cpp(epsilon, X, X_tl, n_states, infer_termination, report=True, in
         f.write(data)
 
     if report:
-        os.system(f"rl_agents/jirp_noise/cpp/a.out {filename} asdf")
+        os.system(f"rl_agents/sjirp/cpp/a.out {filename} asdf")
     else:
-        os.system(f"rl_agents/jirp_noise/cpp/a.out {filename}")
+        os.system(f"rl_agents/sjirp/cpp/a.out {filename}")
 
     json_file = open(filename, 'r')
     data = json.load(json_file)

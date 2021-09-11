@@ -9,10 +9,10 @@ import numpy as np
 import os.path
 
 from rl_agents.jirp.util import *
-from rl_agents.jirp_noise.util import *
+from rl_agents.sjirp.util import *
 from rl_agents.jirp.consts import *
-from rl_agents.jirp_noise.consts import NOISE_UPDATE_X_EVERY_N
-from rl_agents.jirp_noise.smt_noise import smt_noise_cpp
+from rl_agents.sjirp.consts import NOISE_UPDATE_X_EVERY_N, RERUN_ESTIMATES_EVERY_N
+from rl_agents.sjirp.smt_noise import smt_noise_cpp
 
 
 def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, report=True, alg_name=None, seed=None):
@@ -58,12 +58,13 @@ def learn(env,
           use_crm=False,
           use_rs=False,
           results_path=None):
-    ALG_NAME="noise"
-    REPORT=True
+    ALG_NAME="sjirp"
+    REPORT=False
     set_global_seeds(seed)
     print(f"set_global_seeds({seed})")
     assert env.no_rm() or env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
     assert results_path is not None
+    assert seed is not None
 
     infer_termination = TERMINATION
     try:
@@ -73,9 +74,9 @@ def learn(env,
     print(f"(alg) INFERRING TERMINATION: {infer_termination}")
 
     noise_epsilon, noise_delta = extract_noise_params(env)
-    checking_epsilon = noise_epsilon if noise_epsilon > 0.0 else EXACT_EPSILON
-    inference_epsilon = noise_epsilon if noise_epsilon > 0.0 else 0.0
-    
+    inference_epsilon = noise_epsilon
+    checking_epsilon = inference_epsilon + 10*EXACT_EPSILON
+
     print("alg noise epsilon:", noise_epsilon)
     print("alg noise delta:", noise_delta)
 
@@ -171,15 +172,22 @@ def learn(env,
                 if os.path.isfile("signal.txt"):
                     print("detected signal")
                     IPython.embed()
+
                 episode_rewards.append(0.0)
 
                 All.add((tuple(labels), tuple(rewards)))
-                if not run_eqv_noise(checking_epsilon, rm_run(labels, H), rewards):
-                    X_new.add((tuple(labels), tuple(rewards)))
+                if not run_eqv_noise(inference_epsilon, rm_run(labels, H), rewards):
                     if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
-                        tl = info["TimeLimit.truncated"]
-                        if tl:
+                        if info["TimeLimit.truncated"]:
                             X_tl.add((tuple(labels), tuple(rewards)))
+
+                    fixed = make_consistent(checking_epsilon, inference_epsilon, labels, rewards, X, H)
+                    if fixed is not None: # we don't try to fix on first few counterexamples
+                        X.add((tuple(labels), tuple(rewards)))
+                        H = fixed
+                        average_on_X(checking_epsilon, H, All, X, report=REPORT)
+                    else:
+                        X_new.add((tuple(labels), tuple(rewards)))
 
                 if X_new and num_episodes % NOISE_UPDATE_X_EVERY_N == 0:
                     if REPORT:
@@ -198,6 +206,7 @@ def learn(env,
                         results.save(results_path)
                         raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
                     H_new = rm_from_transitions(transitions_new, empty_transition)
+                    average_on_X(checking_epsilon, H_new, All, X, report=REPORT)
                     if not consistent_on_all(checking_epsilon, X, H_new):
                         print("NOT CONSISTENT IMMEDIATELY")
                         IPython.embed()
@@ -208,4 +217,3 @@ def learn(env,
                 break
             s = sn
     results.save(results_path)
-

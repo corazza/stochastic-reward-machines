@@ -16,9 +16,9 @@ from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 from rl_agents.jirp.util import sample_language, dnf_for_empty, rm_from_transitions, initial_Q, get_qmax, get_best_action, transfer_Q
 from rl_agents.jirp.sat_hyp import sat_hyp
 from rl_agents.jirp.consts import *
-from rl_agents.jirp_noise.jirp_noise import detect_signal
-from rl_agents.jirp_noise.consts import *
-from rl_agents.jirp_noise.util import *
+from rl_agents.sjirp.sjirp import detect_signal
+from rl_agents.sjirp.consts import *
+from rl_agents.sjirp.util import *
 
 def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, report=True):
     if len(X) == 0:
@@ -192,6 +192,8 @@ def learn(env,
     assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
     assert results_path is not None
     assert seed is not None
+    ALG_NAME="baseline"
+    REPORT=False
     set_global_seeds(seed)
     print(f"set_global_seeds({seed})")
 
@@ -215,7 +217,7 @@ def learn(env,
 
     description = { 
         "env_name": env.unwrapped.spec.id,
-        "alg_name": "jirp_traj",
+        "alg_name": "baseline",
         "alg_noise_epsilon": noise_epsilon,
         "alg_noise_delta": noise_delta,
         "n_samples": n_samples,

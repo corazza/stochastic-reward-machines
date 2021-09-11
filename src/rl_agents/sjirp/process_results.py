@@ -5,19 +5,19 @@ import IPython
 
 results_path = sys.argv[1]
 
-# jirp_noise
+# sjirp
 # description = { 
 #     "env_name": env.unwrapped.spec.id,
-#     "alg_name": "jirp_noise",
+#     "alg_name": "sjirp",
 #     "alg_noise_epsilon": noise_epsilon,
 #     "alg_noise_delta": noise_delta,
 #     "total_timesteps": total_timesteps,
 # }
 
-# jirp_traj
+# baseline
 # description = { 
 #     "env_name": env.unwrapped.spec.id,
-#     "alg_name": "jirp_traj",
+#     "alg_name": "baseline",
 #     "alg_noise_epsilon": noise_epsilon,
 #     "alg_noise_delta": noise_delta,
 #     "n_samples": n_samples,
@@ -36,7 +36,7 @@ with open(results_path) as f:
     noise_delta = desc['alg_noise_delta']
     title = f"{alg_name} | {env_name} (epsilon={noise_epsilon}"
 
-    if alg_name == 'jirp_traj':
+    if alg_name == 'baseline':
         n_samples = desc['n_samples']
         title += f", delta={noise_delta}, n_samples={n_samples})"
     else:
