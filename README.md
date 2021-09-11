@@ -8,7 +8,7 @@ You need to download and build the [Z3 theorem prover](https://github.com/Z3Prov
 g++ -L/home/USER_NAME/REPOS/z3/build -lz3 -std=c++17 main.cpp
 ```
 
-Where `/home/USER_NAME/REPOS/` is the directory where you cloned Z3. Our repository includes the header file in the right place, one only needs to be able to use `-lz3`.
+Where `/home/USER_NAME/REPOS/z3` is the directory where you cloned and built Z3. Our repository includes the header file in the right place, one only needs to be able to use `-lz3`.
 
 ## Dependencies
 
