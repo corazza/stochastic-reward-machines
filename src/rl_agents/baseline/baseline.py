@@ -3,7 +3,7 @@ JIRP based method
 """
 import math
 import itertools
-from baselines.common.misc_util import set_global_seeds
+from seeds import set_global_seeds
 from profilehooks import profile
 import random, time, copy
 import IPython
