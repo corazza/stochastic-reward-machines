@@ -165,4 +165,4 @@ dependencies:
     - werkzeug==1.0.1
     - wrapt==1.12.1
     - z3-solver==4.8.10.0
-prefix: /home/jcorazza/anaconda3/envs/env2
+prefix: /home/USERNAME/anaconda3/envs/env2
