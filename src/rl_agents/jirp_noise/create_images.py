@@ -86,7 +86,7 @@ for root, dirs, files in os.walk(results_path, topdown=False):
             steps_rebuilding = list(map(lambda x: x[1], results.step_rebuilding))
             n_states = list(map(lambda x: x[2], results.step_rebuilding))
 
-            plot_points = min(PLOT_POINTS, len(steps))            
+            plot_points = min(PLOT_POINTS, len(steps)) 
             idx = np.round(np.linspace(0, len(steps) - 1, plot_points)).astype(int)
             steps = np.array(steps)
             mean_rewards = np.array(mean_rewards)
