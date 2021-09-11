@@ -12,13 +12,35 @@ Where `/home/USER_NAME/REPOS/` is the directory where you cloned Z3. This reposi
 
 ## Dependencies
 
+We manually installed the [OpenAI Baselines from GitHub](https://github.com/openai/baselines), using commit `ea25b9` (Jan 31st 2020).
+
 We provide a full list of dependencies in `./environment.yml`.
 
 ## Running experiments
 
-To run the experiments go in the `scripts/` directory and run the appropriate script with the name for the algorithm, e.g. `./run_mining_parallel sjirp`. The first and only argument can be `sjirp` (for S-JIRP), `baseline` (for the baseline algorithm), or `jirp` (for non-stochastic JIRP). The `parallel` versions of scripts run 10 experiments in forked shells, the `sequential` versions run 10 experiments one by one.
+We provide two scripts in the `./scripts/` directory: `run_parallel.sh` runs 10 experiments in parallel and `run_sequential.sh` runs 10 experiments sequentially one by one.
 
-Results are saved in the `results/NAME/DATE` directory (which will be created).
+E.g. for 10 runs of S-JIRP on the Mining environment:
+
+```bash
+cd scripts
+./run_parallel.sh mining sjirp
+```
+
+The first argument (`mining` in the above example) is one of:
+
+ - `mining` (regular Mining)
+ - `harvest` (regular Harvest)
+ - `mining_ns` (non-stochastic version of Mining)
+ - `harvest_ns` (non-stochastic version of Harvest)
+
+The second argument (`sjirp` in the above example) is one of:
+
+ - `sjirp` (S-JIRP)
+ - `baseline` (the baseline algorithm)
+ - `jirp` (non-stochastic JIRP)
+
+Results are saved in the `results/EXPERIMENT_ALGORITHM/DATE` directory (which will be created).
 
 ## Results processing
 
