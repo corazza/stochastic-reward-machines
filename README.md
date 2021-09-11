@@ -10,6 +10,10 @@ g++ -L/home/USER_NAME/REPOS/z3/build -lz3 -std=c++17 main.cpp
 
 Where `/home/USER_NAME/REPOS/` is the directory where you cloned Z3. This repository includes the header file, one only needs to be able to use `-lz3`.
 
+## Dependencies
+
+We provide a full list of dependencies in `./environment.yml`.
+
 ## Running experiments
 
 To run the experiments go in the `scripts/` directory and run the appropriate script with the name for the algorithm, e.g. `./run_mining_parallel sjirp`. The first and only argument can be `sjirp` (for S-JIRP), `baseline` (for the baseline algorithm), or `jirp` (for non-stochastic JIRP). The `parallel` versions of scripts run 10 experiments in forked shells, the `sequential` versions run 10 experiments one by one.
