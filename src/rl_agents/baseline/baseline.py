@@ -40,12 +40,17 @@ def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, 
             return new_transitions, n_states
         continue
 
-    raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
+    return None
 
-def compute_n_samples(epsilon, delta):
-    ci = delta/(2*4.0)
-    sigma = (2*epsilon)**2 / 12
-    return max(20, math.ceil(((Z_CONF * sigma) / ci)**2))
+def compute_n_samples(epsilon, delta, env_name = None):
+    if "Harvest" in env_name:
+        return 5
+    elif "Mining" in env_name:
+        return 20
+    else:
+        ci = delta/(2*4.0)
+        sigma = (2*epsilon)**2 / 12
+        return max(20, math.ceil(((Z_CONF * sigma) / ci)**2))
 
 def add_to_bank(actions, labels, rewards, sequences_bank, actions_bank):
     if labels not in sequences_bank:
@@ -208,9 +213,10 @@ def learn(env,
     inference_epsilon = noise_epsilon
     checking_epsilon = inference_epsilon + 5*EXACT_EPSILON
 
-    n_samples = compute_n_samples(noise_epsilon, noise_delta)
+    n_samples = compute_n_samples(noise_epsilon, noise_delta, env.unwrapped.spec.id)
     if noise_epsilon == 0.0:
         n_samples = 1
+
     print("alg noise epsilon:", noise_epsilon)
     print("alg noise delta:", noise_delta)
     print(f"need {n_samples} samples for 99% confidence")

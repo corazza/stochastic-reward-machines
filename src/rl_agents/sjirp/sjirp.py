@@ -44,7 +44,7 @@ def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, 
             return new_transitions, n_states
         continue
 
-    raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
+    return None
 
 def learn(env,
           network=None,

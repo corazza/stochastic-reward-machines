@@ -35,7 +35,7 @@ def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, 
         # print("(SMT)")
         # new_transitions = smt_noise(noise_epsilon, X, X_tl, n_states)
         # new_transitions = smt_noise_cpp(noise_epsilon, X, X_tl, n_states, infer_termination, report=False, alg_name=alg_name, seed=seed)
-        new_transitions = sat_hyp(0.0, X, X_tl, n_states, infer_termination) # epsilon does nothing in sat_hyp
+        new_transitions = sat_hyp(0.0, X, X_tl, n_states, infer_termination, report=report) # epsilon does nothing in sat_hyp
 
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
@@ -46,7 +46,7 @@ def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, 
             return new_transitions, n_states
         continue
 
-    raise ValueError(f"Couldn't find machine with at most {MAX_RM_STATES_N} states")
+    return None
 
 def learn(env,
           network=None,
