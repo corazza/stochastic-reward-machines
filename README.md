@@ -2,13 +2,13 @@
 
 ## Building
 
-You need to download and build the [Z3 theorem prover](https://github.com/Z3Prover/z3). Then in this repo `cd` into `src/rl_agents/sjirp/cpp` and build the constraint solver:
+You need to download and build the [Z3 theorem prover](https://github.com/Z3Prover/z3). Then in our repository `cd` into `src/rl_agents/sjirp/cpp` and build the constraint solver:
 
 ```bash
 g++ -L/home/USER_NAME/REPOS/z3/build -lz3 -std=c++17 main.cpp
 ```
 
-Where `/home/USER_NAME/REPOS/` is the directory where you cloned Z3. This repository includes the header file, one only needs to be able to use `-lz3`.
+Where `/home/USER_NAME/REPOS/` is the directory where you cloned Z3. Our repository includes the header file in the right place, one only needs to be able to use `-lz3`.
 
 ## Dependencies
 
@@ -18,7 +18,7 @@ We provide a full list of dependencies in `./environment.yml`.
 
 ## Running experiments
 
-We provide two scripts in the `./scripts/` directory: `run_parallel.sh` runs 10 experiments in parallel and `run_sequential.sh` runs 10 experiments sequentially one by one.
+We provide two scripts in the `./scripts/` directory: `run_parallel.sh` runs 10 experiments in parallel and `run_sequential.sh` which runs 10 experiments sequentially one by one.
 
 E.g. for 10 runs of S-JIRP on the Mining environment:
 
@@ -44,7 +44,7 @@ Results are saved in the `results/EXPERIMENT_ALGORITHM/DATE` directory (which wi
 
 ## Results processing
 
-We have a tool for parsing experiment results and producing png, pgf, or tex files. `cd` into `src/` directory and run:
+We provide a Python script for parsing and displaying experiment results. `cd` into `./src/` directory and run:
 
 To reproduce figures like the ones from the paper, run:
 
