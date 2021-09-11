@@ -7,7 +7,6 @@ from baselines import logger
 from baselines.common.misc_util import set_global_seeds
 import numpy as np
 import os.path
-from rl_agents.jirp.sat_hyp import sat_hyp
 
 from rl_agents.jirp.util import *
 from rl_agents.jirp_noise.util import *
@@ -34,8 +33,7 @@ def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, 
             print(f"finding model with {n_states} states")
         # print("(SMT)")
         # new_transitions = smt_noise(noise_epsilon, X, X_tl, n_states)
-        # new_transitions = smt_noise_cpp(noise_epsilon, X, X_tl, n_states, infer_termination, report=False, alg_name=alg_name, seed=seed)
-        new_transitions = sat_hyp(0.0, X, X_tl, n_states, infer_termination) # epsilon does nothing in sat_hyp
+        new_transitions = smt_noise_cpp(noise_epsilon, X, X_tl, n_states, infer_termination, report=False, alg_name=alg_name, seed=seed)
 
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
@@ -60,13 +58,12 @@ def learn(env,
           use_crm=False,
           use_rs=False,
           results_path=None):
-    ALG_NAME="jirp"
+    ALG_NAME="noise"
     REPORT=True
     set_global_seeds(seed)
     print(f"set_global_seeds({seed})")
     assert env.no_rm() or env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
     assert results_path is not None
-    assert seed is not None
 
     infer_termination = TERMINATION
     try:
@@ -174,7 +171,6 @@ def learn(env,
                 if os.path.isfile("signal.txt"):
                     print("detected signal")
                     IPython.embed()
-
                 episode_rewards.append(0.0)
 
                 All.add((tuple(labels), tuple(rewards)))
@@ -212,3 +208,4 @@ def learn(env,
                 break
             s = sn
     results.save(results_path)
+

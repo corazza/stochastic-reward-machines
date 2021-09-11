@@ -1,0 +1,11 @@
+0 # initial state || d - equipment, g - platinum, a - gold, h - delivery location, f - traps
+[1] # terminal state
+(0,0,'!d&!f',ConstantRewardFunction(0))
+(0,2,'d&!f',ConstantRewardFunction(0))
+(2,2,'!g&!a&!f',ConstantRewardFunction(0))
+(2,3,'g&!a&!f',ConstantRewardFunction(0))
+(2,4,'!g&a&!f',ConstantRewardFunction(0))
+(3,1,'h|f',NoisyContLabelRewardFunction({"h": (1, 0.0), "f": (0, 0)}))
+(3,3,'!h&!f',ConstantRewardFunction(0))
+(4,1,'h|f',NoisyContLabelRewardFunction({"h": (1.1, 0.0), "f": (0, 0)}))
+(4,4,'!h&!f',ConstantRewardFunction(0))

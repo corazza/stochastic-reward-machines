@@ -81,3 +81,9 @@ class HarvestRMEnv4(RewardMachineEnv):
         env = HarvestEnv()
         self.slip_prob = 0.00
         super().__init__(env, ['./envs/grids/reward_machines/harvest/t4.txt'])
+
+class HarvestRMEnv5(RewardMachineEnv):
+    def __init__(self):
+        env = HarvestEnv()
+        self.slip_prob = 0.00
+        super().__init__(env, ['./envs/grids/reward_machines/harvest/t5.txt'])

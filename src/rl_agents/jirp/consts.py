@@ -21,4 +21,6 @@ DISCRETE_NOISE_P = 0.02 # Probability that an episode will be corrupted
 REWARD_FLIP_P = 0.2 # (In a corrupted trace) probability of flipping a reward
 UPDATE_X_EVERY_N_DISCRETE_NOISE = 1000
 
-REGISTER_MEAN_REWARD_EVERY_N_STEP = 1000
+REGISTER_MEAN_REWARD_EVERY_N_STEP = 100
+
+REPORT = False

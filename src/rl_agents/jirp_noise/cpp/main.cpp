@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <set>
 #include <unordered_map>
 #include <memory>
 #include <stdlib.h>
@@ -9,7 +10,6 @@
 
 #include "json.hpp"
 #include "z3++.h"
-
 
 using namespace z3;
 using json = nlohmann::json;
@@ -113,6 +113,12 @@ void print_vec_floats(const std::vector<float> &vec) {
     std::cout << " ]";
 }
 
+void log(int argc, const char *asdf) {
+    if (argc > 2) {
+        std::cout << asdf << std::endl;
+    }
+}
+
 std::vector<HashableTrace> prefixes(std::vector<Trace>& X) {
     std::vector<HashableTrace> result;
 
@@ -146,14 +152,12 @@ std::vector<HashableTrace> prefixes(std::vector<Trace>& X) {
 }
 
 
-bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, int n_states, bool infer_termination, Language language, std::string empty_transition, json *results) {
+bool smt_noise(int argc, float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, int n_states, bool infer_termination, Language language, std::string empty_transition, json *results) {
     std::vector<int> states;
     for (int i = 0; i < n_states; ++i) {
         states.push_back(i);
     }
-    if (infer_termination) {
-        states.push_back(TERMINAL_STATE);
-    }
+    states.push_back(TERMINAL_STATE);
 
     std::vector<HashableTrace> x_prefixes = prefixes(X);
 
@@ -183,7 +187,7 @@ bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, i
         }
     }
 
-    std::cout << "generating constraints" << std::endl;
+    log(argc, "generating constraints");
     for (const auto& p : states) {
         for (const auto& l : language) {
             std::vector<expr> to_disj;
@@ -226,7 +230,7 @@ bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, i
         for (auto const& p : states) {
             expr x_1 = add_x(h_trace.lm, p, &c, &x_dict, &var_counter);
             expr o = o_dict.at(o_dict_key(p, l));
-            s.add(implies(x_1, ((c.real_val(r.c_str()) - o) > -epsilon) && ((c.real_val(r.c_str()) - o) < epsilon)));
+            s.add(implies(x_1, ((c.real_val(r.c_str()) - o) >= -epsilon) && ((c.real_val(r.c_str()) - o) <= epsilon)));
 
             for (auto const& q : states) {
                 expr d = d_dict.at(d_dict_key(p, l, q));
@@ -272,54 +276,87 @@ bool smt_noise(float epsilon_f, std::vector<Trace> X, std::vector<Trace> X_tl, i
                 s.add(o == 0);
             }
         }
+    } else {
+        for (auto const& p : states) {
+            for (auto const& l : language) {
+                expr d = d_dict.at(d_dict_key(p, l, TERMINAL_STATE));
+                s.add(!d);
+            }
+        }
     }
 
-    std::cout << "checking" << std::endl;
+    log(argc, "checking");
 
     auto result = s.check();
-    std::cout << result << std::endl;
+    
+    if (argc > 2) {
+        std::cout << result << std::endl;
+    }
 
     if (result != sat) {
         return false;
     }
 
-    std::cout << "getting model" << std::endl;
+    log(argc, "getting model");
     model m = s.get_model();
-    std::cout << "got model" << std::endl;
+    log(argc, "got model");
     
     json transitions;
+
+    // circumventing Z3 outputs for non-noisy case
+    std::set<float> all_outputs_set;
+    if (epsilon_f == 0) {
+        for (auto const& trace : X) {
+            for (auto const& reward : trace.second) {
+                all_outputs_set.insert(reward);
+            }
+        }
+    }
+    std::vector<float> all_outputs(all_outputs_set.begin(), all_outputs_set.end());
 
     for (auto const& [key, val] : d_dict) {
         if (m.eval(val).is_true()) {
             auto o_key = o_dict_key(key.first.first, key.first.second);
             auto o = m.eval(o_dict.at(o_key));
-            float out = 0.0;
+            double out = 0.0;
             if (o.is_numeral()){
                 out = (double) o.numerator().get_numeral_int64() / (double) o.denominator().get_numeral_int64();
+                if (epsilon_f == 0) {
+                    double min = abs(out - all_outputs[0]);
+                    double min_output = all_outputs[0];
+                    for (auto reward : all_outputs) {
+                        double distance = abs(out - reward);
+                        if (distance < min) {
+                            min = distance;
+                            min_output = reward;
+                        }
+                    }
+                    out = min_output;
+                }
             }
             json transition;
             transition.push_back(key.first.first);
             transition.push_back(key.first.second);
             transition.push_back(key.second);
-            transition.push_back(out);
+            transition.push_back(std::to_string(out));
             transitions.push_back(transition);
         }
     }
 
     *results = transitions;
-    std::cout << "made transitions" << std::endl;
+    log(argc, "made transitions");
 
     return true;
-}
-
-void log(int argc, const char *asdf) {
-    std::cout << asdf << std::endl;
 }
 
 int main(int argc, char *argv[]) {
     log(argc, "SMT executable started");
 
-    std::ifstream i("tmp.json");
+    if (argc > 2) {
+        std::cout << "reading from " << argv[1] << std::endl;
+    }
+    
+    std::ifstream i(argv[1]);
     json j;
     i >> j;
     i.close();
@@ -332,10 +369,14 @@ int main(int argc, char *argv[]) {
         language.push_back(el);
     }
 
-    json transitions;
-    bool result = smt_noise(j["epsilon"], X, X_tl, j["n_states"], j["infer_termination"], language, j["empty_transition"], &transitions);
+    int seed = j["seed"];
+    set_param("sat.random_seed", seed);
+    set_param("smt.random_seed", seed);
 
-    std::ofstream o("tmp_out.json");
+    json transitions;
+    bool result = smt_noise(argc, j["epsilon"], X, X_tl, j["n_states"], j["infer_termination"], language, j["empty_transition"], &transitions);
+
+    std::ofstream o(argv[1]);
     if (result) {
         o << transitions;
     } else {

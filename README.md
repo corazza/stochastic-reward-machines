@@ -1,5 +1,17 @@
 # Stochastic Reward Machines
 
+## Building
+
+You need to download and build the [Z3 theorem prover](https://github.com/Z3Prover/z3). Then in this repo `cd` into `src/rl_agents/jirp_noise/cpp` and build the constraint solver:
+
+```bash
+g++ -L/home/USER_NAME/REPOS/z3/build -lz3 -std=c++17 main.cpp
+```
+
+Where `/home/USER_NAME/REPOS/` is the directory where you cloned Z3.
+
+## Running experiments
+
 To run the experiments go in the `mpi_scripts/` directory and run the appropriate script. The first and only argument is the experiment name. Results are saved in the `mpi_results/EXPERIMENT_NAME/` directory (which will be created).
 
 1. For Mining environment with main algorithm: `./run_mining_jirp_noise.sh EXPERIMENT_NAME`

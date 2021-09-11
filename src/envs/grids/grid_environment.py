@@ -306,6 +306,15 @@ class MiningRMEnvT5(GridRMEnv):
         super().__init__(GridEnv(env), rm_files)
 
 
+# Non-noisy, but for jirp_noise
+class MiningRMEnvT6(GridRMEnv):
+    def __init__(self):
+        rm_files = ["./envs/grids/reward_machines/mine/nonnoisy3.txt"]
+        file_map = "./envs/grids/maps/map_13.txt"
+        self.slip_prob = 0.00 # just for propagating
+        env = CraftWorld(file_map, slip_prob=self.slip_prob)
+        super().__init__(GridEnv(env), rm_files)
+
 # positive slip-chance
 
 class MiningRMEnvST1(GridRMEnv):

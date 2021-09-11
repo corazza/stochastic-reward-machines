@@ -4,6 +4,7 @@ import os
 import time
 import json
 import IPython
+from rl_agents.jirp.consts import EXACT_EPSILON
 
 from rl_agents.jirp.util import run_eqv, rm_run
 
@@ -25,8 +26,39 @@ def consistent_on_all(epsilon, X, H):
             return False
     return True
 
-def make_consistent(epsilon, labels, rewards, X, H):
-    if not consistent_on_all(epsilon, X, H):
+def run_eqv_noise_diff(epsilon, output1, output2):
+    """
+    Returns True if all outputs are within epsilon of each other (output1 is a noise-distorted output2, eg.)
+    """
+    if len(output1) != len(output2):
+        return None
+    for i in range(0, len(output1)):
+        if abs(output1[i] - output2[i]) > epsilon:
+            return output1[i] - output2[i]
+    return None
+
+def run_eqv_noise_i(epsilon, output1, output2):
+    """
+    Returns True if all outputs are within epsilon of each other (output1 is a noise-distorted output2, eg.)
+    """
+    if len(output1) != len(output2):
+        return None
+    for i in range(0, len(output1)):
+        if abs(output1[i] - output2[i]) > epsilon:
+            return i
+    return None
+
+def consistent_on_all_i(epsilon, X, H):
+    for i in range(0, len(X)):
+        (labelsx, rewardsx) = X[i]
+        if not run_eqv_noise(epsilon, rm_run(labelsx, H), rewardsx):
+            return i
+    return None
+
+
+def make_consistent(checking_epsilon, inference_epsilon, labels, rewards, X, H):
+    # if not consistent_on_all(epsilon + 5*EXACT_EPSILON, X, H):
+    if not consistent_on_all(checking_epsilon, X, H):
         print("not consistent!")
         IPython.embed()
 
@@ -38,23 +70,32 @@ def make_consistent(epsilon, labels, rewards, X, H):
             return None
         props = labels[i]
         next_state, reward, done = H2.step(current_state, props, {"true_props": props})
-        if abs(reward - rewards[i]) > epsilon:
+        if abs(reward - rewards[i]) > inference_epsilon:
             if reward < rewards[i]:
-                new_mean = rewards[i] - epsilon
+                new_mean = rewards[i] - inference_epsilon
             else:
-                new_mean = rewards[i] + epsilon
+                new_mean = rewards[i] + inference_epsilon
             H2.move_output(current_state, props, new_mean)
         current_state = next_state
-    if not run_eqv_noise(epsilon, rm_run(labels, H2), rewards):
+    if not run_eqv_noise(checking_epsilon, rm_run(labels, H2), rewards):
         return None
-    if not consistent_on_all(epsilon, X, H2):
+    # if not consistent_on_all(epsilon + 5*EXACT_EPSILON, X, H2):
+    if not consistent_on_all(checking_epsilon, X, H2):
         return None
     return H2
 
-def average_on_X(epsilon, H, All, X):
+def average_on_X(epsilon, H, All, X, report=True):
     outputs_dict = dict()
+    skipped = 0
+    diffs = list()
+    result = copy.deepcopy(H)
     for (labels, rewards) in All:
+        # if len(rm_run(labels, H)) != len(rewards):
+        #     skipped += 1
+        #     continue
         if not run_eqv_noise(epsilon, rm_run(labels, H), rewards):
+            skipped += 1
+            diffs.append(run_eqv_noise_diff(epsilon, rm_run(labels, H), rewards))
             continue
         current_state = H.reset()
         for i in range(0, len(labels)):
@@ -64,17 +105,29 @@ def average_on_X(epsilon, H, All, X):
                 outputs_dict[(current_state, props)] = list()
             outputs_dict[(current_state, props)].append(rewards[i])
             current_state = next_state
+    print(f"skipped {skipped}/{len(All)}")
+    print(diffs)
+    for diff in diffs:
+        if diff is None:
+            continue
+        if abs(diff) > 3.0:
+            IPython.embed()
     for statelabel in outputs_dict:
         rewards = outputs_dict[statelabel]
         rewards = sorted(rewards)
-        average = (rewards[0] + rewards[-1])/2.0
-        H2 = copy.deepcopy(H)
-        H2.move_output(statelabel[0], statelabel[1], average)
-        if consistent_on_all(epsilon, X, H2):
-            H.move_output(statelabel[0], statelabel[1], average)
-            print(f"average {statelabel[0]}-{statelabel[1]}: {average}")
-        else:
-            print(f"inconsistent average {statelabel[0]}-{statelabel[1]}: {average}")
+        midrange = (rewards[0] + rewards[-1])/2.0
+        average = sum(rewards) / len(rewards)
+        H.move_output(statelabel[0], statelabel[1], midrange)
+        result.move_output(statelabel[0], statelabel[1], average)
+        # H2 = copy.deepcopy(H)
+        # H2.move_output(statelabel[0], statelabel[1], midrange)
+        # # if consistent_on_all(epsilon + 5*EXACT_EPSILON, X, H2):
+        # if consistent_on_all(epsilon, X, H2):
+        #     H.move_output(statelabel[0], statelabel[1], average)
+        # else:
+        #     print(f"inconsistent average {statelabel[0]}-{statelabel[1]}: {average}")
+        #     IPython.embed()
+    return result
 
 
 def extract_noise_params(env):
@@ -142,3 +195,36 @@ class EvalResults:
 
         with open(filename, 'w') as f:
             f.write(data)
+
+def start_stepping(H, env, Q, actions, q_init):
+    rm_state = H.reset()
+    s = tuple(env.reset())
+
+    while True:
+        env.show()
+        a = get_best_action(Q[rm_state],s,actions,q_init)
+        sn, r, done, info = env.step(a)
+        sn = tuple(sn)
+        true_props = env.get_events()
+        next_rm_state, _rm_reward, rm_done = H.step(rm_state, true_props, info)
+        rm_state = next_rm_state
+        s = sn
+        IPython.embed()
+
+def clean_trace(labels, rewards):
+    no_more_than = 10
+    labels_new = list()
+    rewards_new = list()
+    last = None
+    counter = 0
+    for i in range(0, len(labels)):
+        if labels[i] == last and counter > no_more_than:
+            continue
+        elif labels[i] == last:
+            counter += 1
+        else:
+            counter = 0
+        labels_new.append(labels[i])
+        rewards_new.append(rewards[i])
+        last = labels[i]
+    return ((tuple(labels_new), tuple(rewards_new)))

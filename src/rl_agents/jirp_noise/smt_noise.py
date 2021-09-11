@@ -5,46 +5,53 @@ from reward_machines.reward_machine import RewardMachine
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineHidden
 from rl_agents.jirp.consts import *
 from rl_agents.jirp.util import *
-
+import time
 
 class Exporter:
-    def __init__(self, epsilon, X, X_tl, n_states, language, empty_transition, infer_termination):
+    def __init__(self, epsilon, X, X_tl, n_states, language, empty_transition, infer_termination, seed):
         self.epsilon = epsilon
-        self.X = list(X)
-        self.X_tl = list(X_tl)
+        self.X = sorted(list(X))
+        self.X_tl = sorted(list(X_tl))
         self.n_states = n_states
-        self.language = list(language)
+        self.language = sorted(list(language))
         self.empty_transition = empty_transition
         self.infer_termination = infer_termination
+        self.seed = seed
         # self.reward_alphabet = list(reward_alphabet)
 
 # TODO termination inference
-def smt_noise_cpp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=False, display=False):
+def smt_noise_cpp(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=False, display=False, alg_name = None, seed=None):
     import json, sys, os
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     reward_alphabet = sample_reward_alphabet(X)
-    exporter = Exporter(epsilon, X, X_tl, n_states, language, empty_transition, infer_termination)
+    exporter = Exporter(epsilon, X, X_tl, n_states, language, empty_transition, infer_termination, seed)
 
-    filename="tmp.json"
+    timestamp = time.time_ns()
+    filename=f"{alg_name}-{timestamp}tmp.json"
     data = json.dumps(exporter.__dict__)
 
     with open(filename, 'w') as f:
         f.write(data)
 
-    os.system("rl_agents/jirp_noise/cpp/a.out")
+    if report:
+        os.system(f"rl_agents/jirp_noise/cpp/a.out {filename} asdf")
+    else:
+        os.system(f"rl_agents/jirp_noise/cpp/a.out {filename}")
 
-    with open("tmp_out.json") as json_file:
-        data = json.load(json_file)
-        if data[0] == 'unsat':
-            return None
+    json_file = open(filename, 'r')
+    data = json.load(json_file)
+    json_file.close()
+    os.remove(filename)
 
-        transitions = dict()        
-        for transition in data:
-            [p, a, q, o] = transition
-            transitions[(p, tuple(a))] = [q, o]
-        return transitions
+    if data[0] == 'unsat':
+        return None
 
+    transitions = dict()        
+    for transition in data:
+        [p, a, q, o] = transition
+        transitions[(p, tuple(a))] = [q, float(o)]
+    return transitions
 
 def smt_noise(epsilon, X, X_tl, n_states, infer_termination, report=True, inspect=False, display=False):
     language = sample_language(X)

@@ -3,6 +3,7 @@ JIRP based method
 """
 import math
 import itertools
+from baselines.common.misc_util import set_global_seeds
 from profilehooks import profile
 import random, time, copy
 import IPython
@@ -19,8 +20,6 @@ from rl_agents.jirp_noise.jirp_noise import detect_signal
 from rl_agents.jirp_noise.consts import *
 from rl_agents.jirp_noise.util import *
 
-
-
 def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, report=True):
     if len(X) == 0:
         transitions = dict()
@@ -31,7 +30,7 @@ def consistent_hyp(noise_epsilon, X, X_tl, infer_termination, n_states_start=1, 
         if report:
             print(f"finding model with {n_states} states")
         # print("(SMT)")
-        new_transitions = sat_hyp(noise_epsilon, X, X_tl, n_states, infer_termination)
+        new_transitions = sat_hyp(noise_epsilon, X, X_tl, n_states, infer_termination, report=report)
         # print("(SAT)")
         # new_transitions_sat = sat_hyp(0.15, X, X_tl, n_states)
         if new_transitions is not None:
@@ -63,7 +62,68 @@ def enough_in_bank(n_samples, sequences_bank, traj):
         return False
     return len(sequences_bank[traj]) >= n_samples
 
-def recompute_X(n_samples, noise_delta, X, sequences_bank):
+def recompute_X2(n_samples, noise_epsilon, noise_delta, X, sequences_bank, report=True):
+    X_result = set()
+    means_dict = dict()
+    for (labels, rewards) in X:
+        rewards_average = list()
+        final_sample_means = list()
+        samples = sequences_bank[labels]
+        assert len(samples) >= n_samples
+        for i in range(0, len(rewards)):
+            rewards_average.append(list())
+            for j in range(0, len(samples)):
+                rewards_average[i].append(samples[j][i])
+            rewards_average[i] = sorted(rewards_average[i])
+            mean = (rewards_average[i][0] + rewards_average[i][-1]) / 2.0
+            means_dict[mean] = rewards_average[i]
+            final_sample_means.append(mean)
+        X_result.add((labels, tuple(final_sample_means)))
+    
+    means = list(means_dict.keys())
+    groups = list(range(0, len(means)))
+    for i in range(0, len(means)):
+        for j in range(i+1, len(means)):
+            if abs(means[i] - means[j]) < noise_delta/2: # confidence intervals overlap
+                groups[j] = groups[i]
+    if report:
+        print("means", means)
+
+    grouped_samples = dict()
+    for i in range(0, len(means)):
+        if groups[i] not in grouped_samples:
+            grouped_samples[groups[i]] = set()
+        for sample in means_dict[means[i]]:
+            grouped_samples[groups[i]].add(sample)
+
+    group_averages = dict()
+    for group in grouped_samples:
+        samples = sorted(list(grouped_samples[group]))
+        if not (samples[-1] - samples[0]) <= 2*noise_epsilon:
+            print("WRONG MEAN SET")
+            IPython.embed()
+        average = (samples[0] + samples[-1])/2
+        group_averages[group] = average
+    if report:
+        print("group averages", group_averages)
+
+    collapsed_means = dict()
+    for i in range(0, len(means)):
+        group = groups[i]
+        collapsed_means[means[i]] = group_averages[group]
+    if report:
+        print("collapsed means", collapsed_means)
+
+    X_final = set()
+    for (labels, rewards) in X_result:
+        rewards_collapsed = list()
+        for reward in rewards:
+            rewards_collapsed.append(collapsed_means[reward])
+        X_final.add((labels, tuple(rewards_collapsed)))
+    return X_final
+
+
+def recompute_X(n_samples, noise_epsilon, noise_delta, X, sequences_bank, report=True):
     X_result = set()
     means = set()
     for (labels, rewards) in X:
@@ -85,14 +145,16 @@ def recompute_X(n_samples, noise_delta, X, sequences_bank):
         for j in range(i+1, len(means)):
             if abs(means[i] - means[j]) < noise_delta/2: # confidence intervals overlap
                 groups[j] = groups[i]
-    print("means", means)
+    if report:
+        print("means", means)
 
     grouped_means = dict()
     for i in range(0, len(means)):
         if groups[i] not in grouped_means:
             grouped_means[groups[i]] = set()
         grouped_means[groups[i]].add(means[i])
-    print("grouped_means", grouped_means)
+    if report:
+        print("grouped_means", grouped_means)
 
     group_average_set = set()
     collapsed_means = dict()
@@ -101,8 +163,9 @@ def recompute_X(n_samples, noise_delta, X, sequences_bank):
         group_average_set.add(group_average)
         for mean in grouped_means[group]:
             collapsed_means[mean] = group_average
-    print("collapsed means", collapsed_means)
-    print("group average set", group_average_set)
+    if report:
+        print("collapsed means", collapsed_means)
+        print("group average set", group_average_set)
 
     X_final = set()
     for (labels, rewards) in X_result:
@@ -128,6 +191,9 @@ def learn(env,
           results_path=None):
     assert env.is_hidden_rm() # JIRP doesn't work with explicit RM environments
     assert results_path is not None
+    assert seed is not None
+    set_global_seeds(seed)
+    print(f"set_global_seeds({seed})")
 
     infer_termination = TERMINATION
     try:
@@ -137,8 +203,12 @@ def learn(env,
     print(f"(alg) INFERRING TERMINATION: {infer_termination}")
 
     noise_epsilon, noise_delta = extract_noise_params(env)
-    
+    inference_epsilon = noise_epsilon
+    checking_epsilon = inference_epsilon + 5*EXACT_EPSILON
+
     n_samples = compute_n_samples(noise_epsilon, noise_delta)
+    if noise_epsilon == 0.0:
+        n_samples = 1
     print("alg noise epsilon:", noise_epsilon)
     print("alg noise delta:", noise_delta)
     print(f"need {n_samples} samples for 99% confidence")
@@ -165,7 +235,7 @@ def learn(env,
     labels = []
     rewards = []
 
-    transitions, n_states_last = consistent_hyp(noise_epsilon, set(), set(), infer_termination)
+    transitions, n_states_last = consistent_hyp(noise_epsilon, set(), set(), infer_termination, report=REPORT)
     language = sample_language(X)
     empty_transition = dnf_for_empty(language)
     H = rm_from_transitions(transitions, empty_transition)
@@ -248,6 +318,10 @@ def learn(env,
             num_evaluation_episodes = len(evaluation_episode_rewards)
             mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
             mean_100evalep_reward = np.mean(evaluation_episode_rewards[-101:-1])
+
+            if step % REGISTER_MEAN_REWARD_EVERY_N_STEP == 0:
+                results.register_mean_reward(step, mean_100ep_reward)
+
             if step%print_freq == 0:
                 logger.record_tabular("steps", step)
                 logger.record_tabular("episodes", num_episodes)
@@ -267,34 +341,36 @@ def learn(env,
                     IPython.embed()
 
                 episode_rewards.append(0.0)
+
                 if following_traj is None:
                     evaluation_episode_rewards.append(0.0)
-                    results.register_mean_reward(step, mean_100evalep_reward)
+                #     results.register_mean_reward(step, mean_100evalep_reward)
                 All.add((tuple(labels), tuple(rewards)))
 
                 # TODO only add if looking for it (if following_traj == labels: ...)
                 add_to_bank(tuple(done_actions_list), tuple(labels), tuple(rewards), sequences_bank, actions_bank)
 
                 if following_traj is None and (num_episodes - last_built <= NOISE_UPDATE_X_EVERY_N or not X_new):
-                    if not run_eqv_noise(noise_epsilon, rm_run(labels, H), rewards):
+                    if not run_eqv_noise(checking_epsilon, rm_run(labels, H), rewards):
                         # (labels, rewards) = clean_trace(labels, rewards)
                         if "TimeLimit.truncated" in info: # could also see if RM is in a terminating state
                             if info["TimeLimit.truncated"]:
                                 X_tl.add((tuple(labels), tuple(rewards)))
 
-                        fixed = make_consistent(noise_epsilon, labels, rewards, X_averaged, H)
+                        fixed = make_consistent(inference_epsilon, checking_epsilon, labels, rewards, X_averaged, H)
                         if fixed is not None: # we don't try to fix on first few counterexamples
                             X.add((tuple(labels), tuple(rewards)))
                             following_traj = tuple(labels)
                             which_one = random.randint(0, len(actions_bank[following_traj])-1)
                             H = fixed
-                            print("FIXEDFIXEDFIXED")
+                            # print("FIXEDFIXEDFIXED")
                         else:
                             X_new.add((tuple(labels), tuple(rewards)))
 
                 if following_traj is None and X_new and num_episodes - last_built >= NOISE_UPDATE_X_EVERY_N:
-                    print(f"len(X)={len(X)}")
-                    print(f"len(X_new)={len(X_new)}")
+                    if REPORT:
+                        print(f"len(X)={len(X)}")
+                        print(f"len(X_new)={len(X_new)}")
 
                     for trace in X.union(X_new):
                         if not enough_in_bank(n_samples, sequences_bank, trace[0]):
@@ -305,8 +381,8 @@ def learn(env,
                         X_old = copy.deepcopy(X)
                         X.update(X_new)
                         X_new = set()
-                        X_averaged = recompute_X(n_samples, noise_delta, X, sequences_bank)
-                        X_tl_averaged = recompute_X(n_samples, noise_delta, X_tl, sequences_bank)
+                        X_averaged = recompute_X2(n_samples, noise_epsilon, noise_delta, X, sequences_bank, report=REPORT)
+                        X_tl_averaged = recompute_X2(n_samples, noise_epsilon, noise_delta, X_tl, sequences_bank, report=REPORT)
 
                         if detect_signal("xnew"):
                             print("ready to compute")
@@ -314,8 +390,11 @@ def learn(env,
 
                         language = sample_language(X)
                         empty_transition = dnf_for_empty(language)
-                        transitions_new, n_states_last = consistent_hyp(noise_epsilon, X_averaged, X_tl_averaged, infer_termination, n_states_last)
+                        transitions_new, n_states_last = consistent_hyp(noise_epsilon, X_averaged, X_tl_averaged, infer_termination, n_states_last, report=REPORT)
                         H_new = rm_from_transitions(transitions_new, empty_transition)
+                        if not consistent_on_all(noise_epsilon, X, H_new):
+                            print("NOT CONSISTENT IMMEDIATELY")
+                            IPython.embed()
                         Q = transfer_Q(noise_epsilon, run_eqv_noise, H_new, H, Q, X_old)
                         H = H_new
                         transitions = transitions_new

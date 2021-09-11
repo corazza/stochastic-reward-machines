@@ -46,7 +46,7 @@ def equivalent_on_X(epsilon, eqv_check, H1, v1, H2, v2, X):
         if eqv_check(epsilon, output1, output2):
             eqv += 1
     if float(eqv)/total >= EQV_THRESHOLD:
-        print(f"H_new/{v1} ~ H_old/{v2} (p ~= {float(eqv)/total})")
+        # print(f"H_new/{v1} ~ H_old/{v2} (p ~= {float(eqv)/total})")
         return True
     return False
 
@@ -91,10 +91,10 @@ def transfer_Q(epsilon, check_eqv, H_new, H_old, Q_old, X):
     for v in H_new.get_states():
         if v in scores:
             Q[v] = copy.deepcopy(Q_old[scores[v][0]])
-            print(f"H_new/{v} ~ H_old/{scores[v][0]} (p ~= {scores[v][1]})")
+            # print(f"H_new/{v} ~ H_old/{scores[v][0]} (p ~= {scores[v][1]})")
         else:
             Q[v] = dict()
-            print(f"H_new/{v} /~ any")
+            # print(f"H_new/{v} /~ any")
     return Q
 
 def rm_run(labels, H):
