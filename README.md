@@ -8,24 +8,22 @@ You need to download and build the [Z3 theorem prover](https://github.com/Z3Prov
 g++ -L/home/USER_NAME/REPOS/z3/build -lz3 -std=c++17 main.cpp
 ```
 
-Where `/home/USER_NAME/REPOS/` is the directory where you cloned Z3.
+Where `/home/USER_NAME/REPOS/` is the directory where you cloned Z3. This repository includes the header file, one only needs to be able to use `-lz3`.
 
 ## Running experiments
 
-To run the experiments go in the `mpi_scripts/` directory and run the appropriate script. The first and only argument is the experiment name. Results are saved in the `mpi_results/EXPERIMENT_NAME/` directory (which will be created).
+To run the experiments go in the `scripts/` directory and run the appropriate script with the name for the algorithm, e.g. `./run_mining_parallel sjirp`. The first and only argument can be `sjirp` (for S-JIRP), `baseline` (for the baseline algorithm), or `jirp` (for non-stochastic JIRP). The `parallel` versions of scripts run 10 experiments in forked shells, the `sequential` versions run 10 experiments one by one.
 
-1. For Mining environment with main algorithm: `./run_mining_sjirp.sh EXPERIMENT_NAME`
-2. For Mining environment with naive algorithm: `./run_mining_baseline.sh EXPERIMENT_NAME`
-3. For Mining environment with JIRP: `./run_mining_jirp.sh EXPERIMENT_NAME`
-
-Etc.
+Results are saved in the `results/NAME/DATE` directory (which will be created).
 
 ## Results processing
 
 We have a tool for parsing experiment results and producing png, pgf, or tex files. `cd` into `src/` directory and run:
 
+To reproduce figures like the ones from the paper, run:
+
 ```bash
-python rl_agents/sjirp/create_images.py ../mpi_results/EXPERIMENT_NAME tex
+python src/process_results.py show results/EXPERIMENT1 results/EXPERIMENT2 results/EXPERIMENT3
 ```
 
-Where "tex" can be replaced with "png" or "pgf" as desired.
+Alternatively use `save` as the first argument to produce a tex file (saved as `combined.tex`). Order matters in the last three arguments because the legend is hardcoded to label the first as S-JIRP, second as the baseline algorithm, and third as JIRP.
