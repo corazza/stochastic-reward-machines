@@ -23,7 +23,7 @@ from baselines.common.cmd_util import arg_parser
 
 from reward_machines.rm_environment import RewardMachineEnv, RewardMachineWrapper, HierarchicalRMWrapper, RewardMachineHidden, RewardMachineDiscreteNoise
 
-from rl_agents.deepqjirp2.atari import AtariDetectionEnv
+# from rl_agents.deepqjirp2.atari import AtariDetectionEnv
 
 def make_vec_env(env_id, env_type, num_env, seed, args, 
                  wrapper_kwargs=None,

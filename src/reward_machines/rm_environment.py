@@ -18,7 +18,7 @@ import IPython
 import random
 
 from reward_machines.reward_machine import RewardMachine
-from rl_agents.deepqjirp2.util import atari_underneath
+# from rl_agents.deepqjirp2.util import atari_underneath
 from rl_agents.jirp.consts import DISCRETE_NOISE_P, REWARD_FLIP_P
 
 
@@ -41,7 +41,7 @@ class RewardMachineEnv(gym.Wrapper):
         """
         super().__init__(env)
 
-        self.is_atari = atari_underneath(env)
+        self.is_atari = False # atari_underneath(env)
 
         # Loading the reward machines
         self.rm_files = rm_files

@@ -4,7 +4,7 @@ JIRP based method
 import random
 import IPython
 from baselines import logger
-from baselines.common.misc_util import set_global_seeds
+from seeds import set_global_seeds
 import numpy as np
 import os.path
 from rl_agents.jirp.sat_hyp import sat_hyp
