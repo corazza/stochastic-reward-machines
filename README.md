@@ -2,7 +2,7 @@
 
 ## Building
 
-You need to download and build the [Z3 theorem prover](https://github.com/Z3Prover/z3). Then in our repository `cd` into `src/rl_agents/sjirp/cpp` and build the constraint solver:
+You need to download and build the [Z3 theorem prover](https://github.com/Z3Prover/z3). Then in our repository `cd` into `./src/rl_agents/sjirp/cpp` and build the constraint solver:
 
 ```bash
 g++ -L/home/USER_NAME/REPOS/z3/build -lz3 -std=c++17 main.cpp
