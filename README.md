@@ -5,7 +5,7 @@
 You need to download and build the [Z3 theorem prover](https://github.com/Z3Prover/z3). Then in our repository `cd` into `./src/rl_agents/sjirp/cpp` and build the constraint solver:
 
 ```bash
-g++ -L/home/USER_NAME/REPOS/z3/build -lz3 -std=c++17 main.cpp
+g++ -L/home/jan/repos/z3/build -I/home/jan/repos/z3/src/api -std=c++17 main.cpp -lz3
 ```
 
 Where `/home/USER_NAME/REPOS/z3` is the directory where you cloned and built Z3. Our repository includes the header file in the right place, one only needs to be able to use `-lz3`.
